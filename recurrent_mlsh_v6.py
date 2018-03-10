@@ -1,10 +1,10 @@
 import tensorflow.contrib.rnn as rnn
 
 from pg import *
-from recurrent_mlsh_v4 import RecurrentMLSHV4
+from recurrent_mlsh_v5 import RecurrentMLSHV5
 
 
-class RecurrentMLSHV5(RecurrentMLSHV4):
+class RecurrentMLSHV6(RecurrentMLSHV5):
     def build_policy_network_op(self, scope="policy_network"):
         if self.discrete:
             with tf.variable_scope(name_or_scope='policy', reuse=False):
@@ -181,5 +181,5 @@ class RecurrentMLSHV5(RecurrentMLSHV4):
 if __name__ == "__main__":
     env = gym.make(config.env_name)
     config = config('RecurrentMLSH-v6')
-    model = RecurrentMLSHV5(env, config)
+    model = RecurrentMLSHV6(env, config)
     model.run()

@@ -30,11 +30,11 @@ class config():
         self.record_path = output_path
         self.output_path = output_path
 
-    # env_name = "CartPole-v0"
+    env_name = "CartPole-v0"
     # env_name = "InvertedPendulum-v1"
     # env_name = "Fourrooms-v1"
     # env_name = "HalfCheetah-v1"
-    env_name = "Ant-v1"
+    # env_name = "Ant-v1"
 
     batch_size_by_env = {
         "CartPole-v0": 100, "Fourrooms-v1": 1000, "HalfCheetah-v1": 50000, \

@@ -155,6 +155,6 @@ class RecurrentMLSHV5(RecurrentMLSHV4):
 
 if __name__ == "__main__":
     env = gym.make(config.env_name)
-    config = config('RecurrentMLSH-v6')
+    config = config('RecurrentMLSH-v5')
     model = RecurrentMLSHV5(env, config)
     model.run()
