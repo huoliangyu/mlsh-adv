@@ -1,3 +1,6 @@
 [submodule "MLSH"]
 	path = mlsh 
 	url = https://github.com/openai/mlsh.git
+[submodule "baselines"]
+	path = baselines
+	url = https://github.com/openai/baselines.git
