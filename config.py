@@ -35,25 +35,26 @@ class config():
     # env_name = "Fourrooms-v1"
     # env_name = "HalfCheetah-v1"
     # env_name = "Ant-v1"
+    # env_name = "Ant-v2"
 
     batch_size_by_env = {
-        "CartPole-v0": 100, "Fourrooms-v1": 1000, "HalfCheetah-v1": 50000, \
-        "Ant-v1": 100000
+        "CartPole-v0": 64, "Fourrooms-v1": 1000, "HalfCheetah-v1": 50000, \
+        "Ant-v1": 100000, "Ant-v2": 64
     }
 
     lr_by_env = {
         "CartPole-v0": 3e-2, "Fourrooms-v1": 3e-2, "HalfCheetah-v1": 3e-2,
-        "Ant-v1": 3e-2
+        "Ant-v1": 3e-2, "Ant-v2": 3e-2
     }
 
     gamma_by_env = {
         "CartPole-v0": 1.0, "Fourrooms-v1": 1.0, "HalfCheetah-v1": 0.9,
-        "Ant-v1": 0.8
+        "Ant-v1": 0.8, "Ant-v2": 0.8
     }
 
     num_batches_by_env = {
         "CartPole-v0": 1000, "Fourrooms-v1": 100, "HalfCheetah-v1": 1000,
-        "Ant-v1": 1000
+        "Ant-v1": 1000, "Ant-v2": 1000
     }
 
     examine_master = False
@@ -74,13 +75,13 @@ class config():
     normalize_advantage = True
     n_layers = 4
     baseline_layer_size = 32
-    max_num_sub_policies = 40
-    num_sub_policies = 4
+    max_num_sub_policies = 3
+    num_sub_policies = 1
 
     sub_policy_network = 'LSTM'
     master_network = 'LSTM'
-    num_sub_policy_layers = 8
-    num_master_layers = 8
+    num_sub_policy_layers = 2
+    num_master_layers = 2
 
     weight_average = False
     activation = tf.nn.relu
