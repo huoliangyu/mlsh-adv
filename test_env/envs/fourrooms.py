@@ -18,7 +18,7 @@ RIGHT = 2
 UP = 3
 
 MAPS = {
-    "9x9": [
+    "0": [
         "XXGXXXXXX",
         "XOOOXOOOX",
         "XOOOOOOOX",
@@ -26,8 +26,19 @@ MAPS = {
         "XXOXXXOXX",
         "XOOOXOOOX",
         "XOOOOOOOX",
-        "XOOOXOOOX",
+        "XOOOXOOSX",
         "XXXXXXXXX",
+    ],
+    "1": [
+        "XXXXXXXXX",
+        "XSOOXOOOX",
+        "XOOOOOOOX",
+        "XOOOXOOOX",
+        "XXOXXXOXX",
+        "XOOOXOOOX",
+        "XOOOOOOOX",
+        "XOOOXOOOX",
+        "XXXXXXGXX",
     ]
 }
 
@@ -57,7 +68,7 @@ class Fourrooms(discrete.DiscreteEnv):
         'video.frames_per_second': 50
     }
 
-    def __init__(self, desc=None, map_name="9x9"):
+    def __init__(self, desc=None, map_name=str(np.random.randint(0, 2))):
         if desc is None and map_name is None:
             raise ValueError('Must provide either desc or map_name')
         elif desc is None:
@@ -68,7 +79,7 @@ class Fourrooms(discrete.DiscreteEnv):
         nA = 4
         nS = nrow * ncol
 
-        isd = np.array(desc == b'O').astype('float64').ravel()
+        isd = np.array(desc == b'S').astype('float64').ravel()
         P = {s: {a: [] for a in range(nA)} for s in range(nS)}
 
         def to_s(row, col):

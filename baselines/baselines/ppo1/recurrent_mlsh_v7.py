@@ -39,6 +39,9 @@ class RecurrentMLSHV7(object):
     def dynamic_rnn(self, cell, inputs, batch_size):
         def rnn_forward(out, hidden, alive, count_length):
             new_out, new_hidden = cell(inputs, hidden)
+            new_out = tf.nn.batch_normalization(new_out, 0, 1, offset=None,
+                                                scale=None,
+                                                variance_epsilon=1e-14)
             new_out = tf.expand_dims(new_out, axis=1)
             new_out = tf.concat([out, new_out], axis=1)
             alive_now = tf.cast(out[:, -1, -1] > 0, tf.int32)
@@ -50,6 +53,8 @@ class RecurrentMLSHV7(object):
 
         hidden = cell.zero_state(batch_size, tf.float32)
         out, hidden = cell(inputs, hidden)
+        out = tf.nn.batch_normalization(out, 0, 1, offset=None, scale=None,
+                                        variance_epsilon=1e-14)
         out = tf.expand_dims(out, axis=1)
         count_length = tf.constant(1, shape=[batch_size])
 
@@ -69,8 +74,7 @@ class RecurrentMLSHV7(object):
                                  tuple(raw_shape), tf.TensorShape(batch_size),
                                  tf.TensorShape(batch_size)])
 
-    def policy_network(self, input, output_size, scope,
-                       size=config.baseline_layer_size,
+    def policy_network(self, input, scope, size=config.baseline_layer_size,
                        n_layers=config.n_layers, output_activation=None,
                        batch_size=config.batch_size):
 
@@ -181,7 +185,7 @@ class RecurrentMLSHV7(object):
         assert isinstance(ob_space, gym.spaces.Box)
 
         self.pdtype = pdtype = make_pdtype(ac_space)
-        self.action_dim = self.pdtype.param_shape()[0]
+        self.action_dim = self.pdtype.param_shape()[0] // 2
         sequence_length = None
 
         ob = U.get_placeholder(name="ob", dtype=tf.float32,
@@ -205,8 +209,7 @@ class RecurrentMLSHV7(object):
 
         with tf.variable_scope('pol'):
             if gaussian_fixed_var and isinstance(ac_space, gym.spaces.Box):
-                mean = self.policy_network(obz, self.action_dim,
-                                           'RecurrentMLSHV6',
+                mean = self.policy_network(obz, 'RecurrentMLSHV6',
                                            batch_size=self.batch_size)
 
                 logstd = tf.get_variable(name="logstd", shape=[1,
@@ -215,8 +218,7 @@ class RecurrentMLSHV7(object):
                                          initializer=tf.zeros_initializer())
                 pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
             else:
-                pdparam = self.policy_network(obz, self.action_dim,
-                                              'RecurrentMLSHV6',
+                pdparam = self.policy_network(obz, 'RecurrentMLSHV6',
                                               batch_size=self.batch_size)
 
         self.pd = pdtype.pdfromflat(pdparam)

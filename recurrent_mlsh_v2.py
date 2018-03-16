@@ -9,7 +9,6 @@ class RecurrentMLSHV2(PolicyGradient):
                        n_layers=config.n_layers, output_activation=None):
 
         if str(config.env_name).startswith("Fourrooms"):
-
             self.state_embedding = tf.tile(
                 tf.one_hot(indices=tf.cast(mlp_input, dtype=tf.int32),
                            depth=self.env.nS), [1, config.num_sub_policies, 1])
@@ -41,7 +40,7 @@ class RecurrentMLSHV2(PolicyGradient):
         last_output = self.out[:, -1, :]
 
         self.chosen_index = tf.argmax(last_output, axis=1)
-        # self.weights = tf.nn.softmax(logits=last_output, dim=
+
         self.weights = tf.one_hot(indices=self.chosen_index,
                                   depth=config.num_sub_policies)
 
@@ -59,3 +58,4 @@ if __name__ == "__main__":
     config = config('RecurrentMLSH-v2')
     model = RecurrentMLSHV2(env, config)
     model.run()
+
