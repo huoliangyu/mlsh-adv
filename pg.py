@@ -1,4 +1,7 @@
 import os
+import time
+import datetime
+
 from collections import Counter
 
 import gym
@@ -12,6 +15,8 @@ from config import config
 from test_env import *
 from utils.general import export_plot, get_logger
 
+def get_timestamp():
+  return datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d%H%M%S')
 
 class PolicyGradient(object):
     def save_model_checkpoint(self, session, saver, filename, epoch_num):
@@ -212,8 +217,6 @@ class PolicyGradient(object):
         rooms_and_sub_policies = {}
 
         while num_episodes or t < self.config.batch_size:
-            env = gym.make(self.config.get_env_name())
-            self.env = env
             state = env.reset()
             states, actions, rewards = [], [], []
             episode_reward = 0
@@ -338,118 +341,134 @@ class PolicyGradient(object):
             'room' + str(i): {j: [] for j in range(config.num_sub_policies)} for
             i in range(4)}
 
-        for t in range(self.config.num_batches):
-            print(t, self.get_epsilon(t))
-            paths, total_rewards = self.sample_path(env=self.env)
+        num_tasks = 1
+        if self.config.do_meta_learning:
+            num_tasks = self.config.num_meta_learning_training_tasks
+        print 'self.config.do_meta_learning = %s' % self.config.do_meta_learning
+        print 'num_tasks = %s' % num_tasks
 
-            scores_eval += total_rewards
+        for taski in xrange(num_tasks):
+            if self.config.do_meta_learning:
+                env_name = self.config.get_env_name()
+                self.env = gym.make(env_name)
+                print 'task #%s: %s' % (taski, env_name)
 
-            if str(config.env_name).startswith("Fourrooms"):
-                observations = np.expand_dims(
-                    np.concatenate([path["observation"] for path in paths]),
-                    axis=1)
-            else:
-                observations = np.concatenate(
-                    [path["observation"] for path in paths])
+            for t in range(self.config.num_batches):
+                print(t, self.get_epsilon(t))
+                paths, total_rewards = self.sample_path(env=self.env)
 
-            actions = np.concatenate([path["action"] for path in paths])
-            rewards = np.concatenate([path["reward"] for path in paths])
-            returns = self.get_returns(paths)
-            advantages = self.calculate_advantage(returns, observations)
+                scores_eval += total_rewards
 
-            if self.config.use_baseline:
-                self.update_baseline(returns, observations)
+                if str(config.env_name).startswith("Fourrooms"):
+                    observations = np.expand_dims(
+                        np.concatenate([path["observation"] for path in paths]),
+                        axis=1)
+                else:
+                    observations = np.concatenate(
+                        [path["observation"] for path in paths])
 
-            self.sess.run(self.train_op, feed_dict={
-                self.observation_placeholder: observations,
-                self.action_placeholder: actions,
-                self.advantage_placeholder: advantages
-            })
+                actions = np.concatenate([path["action"] for path in paths])
+                rewards = np.concatenate([path["reward"] for path in paths])
+                returns = self.get_returns(paths)
+                advantages = self.calculate_advantage(returns, observations)
 
-            if t % self.config.summary_freq == 0:
-                self.update_averages(total_rewards, scores_eval)
-                self.record_summary(self.batch_counter)
+                if self.config.use_baseline:
+                    self.update_baseline(returns, observations)
 
-            self.batch_counter += 1
-
-            avg_reward = np.mean(total_rewards)
-            sigma_reward = np.sqrt(np.var(total_rewards) / len(total_rewards))
-            msg = "Average reward: {:04.2f} +/- {:04.2f}".format(avg_reward,
-                                                                 sigma_reward)
-            self.logger.info(msg)
-
-            last_record += 1
-            if self.config.record and (last_record > self.config.record_freq):
-                self.logger.info("Recording...")
-                last_record = 0
-                self.record()
-
-            # TODO: Message for Jiayu: This is the subpolicy viz code
-            if t == config.num_batches - 1 and config.visualize_sub_policies:
-                logits = self.sess.run(self.sub_policies, feed_dict={
-                    self.observation_placeholder: np.expand_dims(np.arange(81),
-                                                                 axis=1)
+                self.sess.run(self.train_op, feed_dict={
+                    self.observation_placeholder: observations,
+                    self.action_placeholder: actions,
+                    self.advantage_placeholder: advantages
                 })
-                plt.clf()
-                fig, axes = plt.subplots(1, 2)
 
-                left = 0
-                down = 1
-                right = 2
-                up = 3
-                block = -1
-                goal = -2
+                if t % self.config.summary_freq == 0:
+                    self.update_averages(total_rewards, scores_eval)
+                    self.record_summary(self.batch_counter)
 
-                for sub in range(config.num_sub_policies):
-                    actions = np.argmax(logits[:, sub, :], axis=1)
-                    map = [left, down, right, up]
+                self.batch_counter += 1
 
-                    grid_vector = [map[i] for i in actions]
+                avg_reward = np.mean(total_rewards)
+                sigma_reward = np.sqrt(np.var(total_rewards) / len(total_rewards))
+                msg = "Average reward: {:04.2f} +/- {:04.2f}".format(avg_reward,
+                                                                     sigma_reward)
+                self.logger.info(msg)
 
-                    room0 = [2, 10, 11, 12, 19, 20, 21, 28, 29, 30]
-                    room1 = [14, 15, 16, 22, 23, 24, 25, 32, 33, 34]
-                    room2 = [38, 46, 47, 48, 55, 56, 57, 64, 65, 66]
-                    room3 = [42, 50, 51, 52, 58, 59, 60, 61, 68, 69, 70]
+                last_record += 1
+                if self.config.record and (last_record > self.config.record_freq):
+                    self.logger.info("Recording...")
+                    last_record = 0
+                    self.record()
 
-                    indices = room0 + room1 + room2 + room3
+                # TODO: Message for Jiayu: This is the subpolicy viz code
+                if t == config.num_batches - 1 and config.visualize_sub_policies:
+                    logits = self.sess.run(self.sub_policies, feed_dict={
+                        self.observation_placeholder: np.expand_dims(np.arange(81),
+                                                                     axis=1)
+                    })
+                    plt.clf()
+                    fig, axes = plt.subplots(1, 2)
 
-                    for i in range(81):
-                        if i not in indices:
-                            grid_vector[i] = block
+                    left = 0
+                    down = 1
+                    right = 2
+                    up = 3
+                    block = -1
+                    goal = -2
 
-                    grid_vector[2] = goal
-                    grid_vector[78] = goal
+                    for sub in range(config.num_sub_policies):
+                        actions = np.argmax(logits[:, sub, :], axis=1)
+                        map = [left, down, right, up]
 
-                    grid = np.array_split(grid_vector, 9)
-                    # create discrete colormaps
-                    cmap = colors.ListedColormap(
-                        ['green', 'black', 'red', 'blue', 'pink', 'cyan'])
-                    bounds = [-2, -1, 0, 1, 2, 3, 4]
-                    norm = colors.BoundaryNorm(bounds, cmap.N)
+                        grid_vector = [map[i] for i in actions]
 
-                    ax = axes[sub % 2]
-                    ax.imshow(grid, cmap=cmap, norm=norm)
-                    ax.set_title('Sub Policy ' + str(sub))
+                        room0 = [2, 10, 11, 12, 19, 20, 21, 28, 29, 30]
+                        room1 = [14, 15, 16, 22, 23, 24, 25, 32, 33, 34]
+                        room2 = [38, 46, 47, 48, 55, 56, 57, 64, 65, 66]
+                        room3 = [42, 50, 51, 52, 58, 59, 60, 61, 68, 69, 70]
 
-                    # draw gridlines
-                    ax.grid(which='major', axis='both', linestyle='-',
-                            color='k', linewidth=2)
-                    ax.set_xticks(np.arange(-.5, 9, 1))
-                    ax.set_yticks(np.arange(-.5, 9, 1))
-                    ax.xaxis.set_ticklabels([])
-                    ax.yaxis.set_ticklabels([])
-                plt.tight_layout()
-                plt.savefig(str(np.random.randint(0, 10000)) + ' test.png')
+                        indices = room0 + room1 + room2 + room3
 
-            if t % config.record_freq == 0:
-                self.save_model_checkpoint(self.sess, self.saver,
-                                           os.path.join(self.config.output_path,
+                        for i in range(81):
+                            if i not in indices:
+                                grid_vector[i] = block
 
-                                                        'model.ckpt'), t)
+                        grid_vector[2] = goal
+                        # grid_vector[78] = goal
+                        # grid_vector[self.env.goal] = goal
+
+                        grid = np.array_split(grid_vector, 9)
+                        # create discrete colormaps
+                        cmap = colors.ListedColormap(
+                            ['green', 'black', 'red', 'blue', 'pink', 'cyan'])
+                        bounds = [-2, -1, 0, 1, 2, 3, 4]
+                        norm = colors.BoundaryNorm(bounds, cmap.N)
+
+                        ax = axes[sub % 2]
+                        ax.imshow(grid, cmap=cmap, norm=norm)
+                        ax.set_title('Sub Policy ' + str(sub))
+
+                        # draw gridlines
+                        ax.grid(which='major', axis='both', linestyle='-',
+                                color='k', linewidth=2)
+                        ax.set_xticks(np.arange(-.5, 9, 1))
+                        ax.set_yticks(np.arange(-.5, 9, 1))
+                        ax.xaxis.set_ticklabels([])
+                        ax.yaxis.set_ticklabels([])
+                    plt.tight_layout()
+                    # plt.savefig(str(np.random.randint(0, 10000)) + ' test.png')
+                    plt.savefig('plots/subpolicies_%s.png' % get_timestamp())
+                    
+
+                if t % config.record_freq == 0:
+                    self.save_model_checkpoint(self.sess, self.saver,
+                                               os.path.join(self.config.output_path,
+
+                                                            'model.ckpt'), t)
 
         self.logger.info("- Training done.")
         export_plot(scores_eval, "Score", config.env_name,
                     self.config.plot_output)
+        export_plot(scores_eval, "Score", config.env_name, "plots/score_%s.png" % get_timestamp())
 
         if str(config.env_name).startswith(
             "Fourrooms") and config.visualize_master_policy:
@@ -468,8 +487,10 @@ class PolicyGradient(object):
                                    range(config.num_sub_policies)],
                                   loc='upper left', prop={'size': 20})
             plt.tight_layout()
-            plt.savefig('Rooms and Subs ' + str(np.random.randint(0, 10000)),
-                        dpi=300)
+            # plt.savefig('Rooms and Subs ' + str(np.random.randint(0, 10000)),
+            #             dpi=300)
+            plt.savefig('plots/action_logits_per_room_%s.png' % get_timestamp(), dpi=300)
+            
 
     def get_room_by_state(self, state):
         room0 = [2, 10, 11, 12, 19, 20, 21, 28, 29, 30]

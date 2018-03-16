@@ -54,6 +54,9 @@ class RecurrentMLSHV2(PolicyGradient):
 
 
 if __name__ == "__main__":
+    if not os.path.exists('./plots'):
+        os.makedirs('./plots')
+
     env = gym.make(config.env_name)
     config = config('RecurrentMLSH-v2')
     model = RecurrentMLSHV2(env, config)

@@ -9,6 +9,22 @@ class config():
             raise Exception()
         self.algorithm = algorithm
 
+        # output_path = "results/%s-bs=%s-algo=%s-usebaseline=%s-lr=%s" \
+        #               "-baselinelayers=%sx%s-num_sub=%s-maxeps=%s-min" \
+        #               "eps=%s-sub_index=%s-freezesub=%s-uniquestr" \
+        #               "=%s-numsublayers=%s-nummasterlayers=%s-max_num_sub" \
+        #               "=%s-weighted_avg=%s-sub_net=%s" \
+        #               "-master_net=%s" \
+        #               "/" % (self.env_name, self.batch_size, self.algorithm,
+        #                      self.use_baseline, self.learning_rate,
+        #                      self.n_layers, self.baseline_layer_size,
+        #                      self.num_sub_policies, self.max_epsilon,
+        #                      self.min_epsilon, self.sub_policy_index,
+        #                      self.freeze_sub_policy, self.unique_key,
+        #                      self.num_sub_policy_layers, self.num_master_layers,
+        #                      self.max_num_sub_policies, self.weight_average,
+        #                      self.sub_policy_network, self.master_network)
+
         output_path = "results/%s-bs=%s-algo=%s-usebaseline=%s-lr=%s" \
                       "-baselinelayers=%sx%s-num_sub=%s-maxeps=%s-min" \
                       "eps=%s-sub_index=%s-freezesub=%s-uniquestr" \
@@ -31,10 +47,13 @@ class config():
         self.record_path = output_path
         self.output_path = output_path
 
+    do_meta_learning = True
+    num_meta_learning_training_tasks = 20
+
     # env_name = "CartPole-v0"
     # env_name = 'BipedalWalker-v2'
     # env_name = "InvertedPendulum-v1"
-    env_name = "Fourrooms-v1"
+    env_name = "Fourrooms-v0"
 
     # env_name = "HalfCheetah-v1"
     # env_name = "Ant-v1"
@@ -42,26 +61,26 @@ class config():
 
     # TODO message: Jiayu, this is where you can choose to alternate envs or not
     def get_env_name(self):
-        # return "Fourrooms-v" + str(np.random.randint(0, 2))
-        return "Fourrooms-v0"
+        return "Fourrooms-v" + str(np.random.randint(0, 2))
+        # return "Fourrooms-v0"
 
     batch_size_by_env = {
-        "CartPole-v0": 64, "Fourrooms-v1": 1000, "HalfCheetah-v1": 50000, \
+        "CartPole-v0": 64, "Fourrooms-v0": 1000,"Fourrooms-v1": 1000, "HalfCheetah-v1": 50000, \
         "Ant-v1": 100000, "Ant-v2": 64, "BipedalWalker-v2": 256
     }
 
     lr_by_env = {
-        "CartPole-v0": 3e-2, "Fourrooms-v1": 3e-2, "HalfCheetah-v1": 3e-2,
+        "CartPole-v0": 3e-2, "Fourrooms-v0": 3e-2, "Fourrooms-v1": 3e-2, "HalfCheetah-v1": 3e-2,
         "Ant-v1": 3e-2, "Ant-v2": 3e-2, "BipedalWalker-v2": 3e-2
     }
 
     gamma_by_env = {
-        "CartPole-v0": 1.0, "Fourrooms-v1": 1.0, "HalfCheetah-v1": 0.9,
+        "CartPole-v0": 1.0, "Fourrooms-v0": 1.0, "Fourrooms-v1": 1.0, "HalfCheetah-v1": 0.9,
         "Ant-v1": 0.8, "Ant-v2": 0.8, "BipedalWalker-v2": 1.0
     }
 
     num_batches_by_env = {
-        "CartPole-v0": 100, "Fourrooms-v1": 10, "HalfCheetah-v1": 1000,
+        "CartPole-v0": 100, "Fourrooms-v0": 100, "Fourrooms-v1": 100, "HalfCheetah-v1": 1000,
         "Ant-v1": 1000, "Ant-v2": 1000, "BipedalWalker-v2": 1000
     }
 
