@@ -18,7 +18,7 @@ RIGHT = 2
 UP = 3
 
 MAPS = {
-    "0": [
+    "small": [
         "XXGXXXXXX",
         "XOOOXOOOX",
         "XOOOOOOOX",
@@ -26,20 +26,47 @@ MAPS = {
         "XXOXXXOXX",
         "XOOOXOOOX",
         "XOOOOOOOX",
-        "XOOOXOOSX",
+        "XOOOXOOOX",
         "XXXXXXXXX",
     ],
-    "1": [
-        "XXXXXXXXX",
-        "XSOOXOOOX",
-        "XOOOOOOOX",
-        "XOOOXOOOX",
-        "XXOXXXOXX",
-        "XOOOXOOOX",
-        "XOOOOOOOX",
-        "XOOOXOOOX",
-        "XXXXXXGXX",
-    ]
+    "medium": [
+        "XXXXXXXXXXXXX",
+        "XOOOOOXOOOOOX",
+        "XOOOOOXOOOOOX",
+        "XOOOOOOOOOOOX",
+        "XOOOOOXOOOOOX",
+        "XOOOOOXOOOOOX",
+        "XXXOXXXXXOXXX",
+        "XOOOOOXOOOOOX",
+        "XOOOOOXOOOOOX",
+        "XOOOOOOOOOOOX",
+        "XOOOOOXOOOOOX",
+        "XOOOOOXOOOOOX",
+        "XXXXXXXXXXXXX",
+    ],
+    "large": [
+        "XXXXXXXXXXXXXXXXXXXXX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XOOOOOOOOOOOOOOOOOOOX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XXXXXOXXXXXXXXXOXXXXX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XOOOOOOOOOOOOOOOOOOOX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XOOOOOOOOOXOOOOOOOOOX",
+        "XXXXXXXXXXXXXXXXXXXXX",
+    ],
 }
 
 
@@ -68,7 +95,7 @@ class Fourrooms(discrete.DiscreteEnv):
         'video.frames_per_second': 50
     }
 
-    def __init__(self, desc=None, map_name=str(np.random.randint(0, 2))):
+    def __init__(self, desc=None, map_name='small'):
         if desc is None and map_name is None:
             raise ValueError('Must provide either desc or map_name')
         elif desc is None:
@@ -79,7 +106,37 @@ class Fourrooms(discrete.DiscreteEnv):
         nA = 4
         nS = nrow * ncol
 
+        self.goal = 2
+        self.start = nS - self.ncol - 2
+
+        # print desc
+        # print 'self.goal = %s' % self.goal
+        # print 'self.start = %s' % self.start
+        # print 'self.nrow = %s' % nrow
+        # print 'self.ncol = %s' % ncol
+        # print 'self.start / nrow = %s' % (self.start / nrow)
+        # print 'self.start / ncol = %s' % (self.start / ncol)
+
+        desc[self.start / nrow][self.start % ncol] = 'S'
+        desc[self.goal / nrow][self.goal % ncol] = 'G'
+
         isd = np.array(desc == b'S').astype('float64').ravel()
+        isd[self.start] = 1.0
+
+        # print '-------------------'
+        # print desc
+        # print '-------------------'
+        # print np.array(desc == b'S')
+        # print '-------------------'
+        # print np.array(desc == b'S').astype('float64')
+        # print '-------------------'
+        # print np.array(desc == b'S').astype('float64').ravel()
+        # print '-------------------'
+        # print isd
+        # print '-------------------'
+        # print np.array_split(isd, nrow)
+        # print '-------------------'
+
         P = {s: {a: [] for a in range(nA)} for s in range(nS)}
 
         def to_s(row, col):
@@ -104,10 +161,12 @@ class Fourrooms(discrete.DiscreteEnv):
         for row in range(nrow):
             for col in range(ncol):
                 s = to_s(row, col)
-                for a in range(4):
+                for a in range(nA):
                     li = P[s][a]
                     letter = desc[row, col]
+
                     if letter in b'G':
+                    # if s == self.goal:
                         li.append((1.0, s, 0, True))
                     else:
                         # TODO(yejiayu): Add stochastic case.
@@ -117,6 +176,11 @@ class Fourrooms(discrete.DiscreteEnv):
                         done = bytes(newletter) in b'GH'
                         rew = float(newletter == b'G') * 100 - 1
                         li.append((1.0, newstate, rew, done))
+
+
+        # print '-------------------'
+        # print P
+        # print '-------------------'
 
         super(Fourrooms, self).__init__(nS, nA, P, isd)
 

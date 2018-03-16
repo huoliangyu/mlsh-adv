@@ -53,7 +53,9 @@ class config():
     # env_name = "CartPole-v0"
     # env_name = 'BipedalWalker-v2'
     # env_name = "InvertedPendulum-v1"
-    env_name = "Fourrooms-v0"
+    env_name = "Fourrooms-small-v0"
+    # env_name = "Fourrooms-medium-v0"
+    # env_name = "Fourrooms-large-v0"
 
     # env_name = "HalfCheetah-v1"
     # env_name = "Ant-v1"
@@ -61,27 +63,51 @@ class config():
 
     # TODO message: Jiayu, this is where you can choose to alternate envs or not
     def get_env_name(self):
-        return "Fourrooms-v" + str(np.random.randint(0, 2))
-        # return "Fourrooms-v0"
+        # return "Fourrooms-v" + str(np.random.randint(0, 2))
+        return "Fourrooms-small-v0"
 
     batch_size_by_env = {
-        "CartPole-v0": 64, "Fourrooms-v0": 1000,"Fourrooms-v1": 1000, "HalfCheetah-v1": 50000, \
-        "Ant-v1": 100000, "Ant-v2": 64, "BipedalWalker-v2": 256
+        "CartPole-v0": 64,
+        "Fourrooms-small-v0": 1000,
+        "Fourrooms-medium-v0": 1000,
+        "Fourrooms-large-v0": 1000,
+        "HalfCheetah-v1": 50000,
+        "Ant-v1": 100000,
+        "Ant-v2": 64,
+        "BipedalWalker-v2": 256
     }
 
     lr_by_env = {
-        "CartPole-v0": 3e-2, "Fourrooms-v0": 3e-2, "Fourrooms-v1": 3e-2, "HalfCheetah-v1": 3e-2,
-        "Ant-v1": 3e-2, "Ant-v2": 3e-2, "BipedalWalker-v2": 3e-2
+        "CartPole-v0": 3e-2,
+        "Fourrooms-small-v0": 3e-2,
+        "Fourrooms-medium-v0": 3e-2,
+        "Fourrooms-large-v0": 3e-2,
+        "HalfCheetah-v1": 3e-2,
+        "Ant-v1": 3e-2,
+        "Ant-v2": 3e-2,
+        "BipedalWalker-v2": 3e-2
     }
 
     gamma_by_env = {
-        "CartPole-v0": 1.0, "Fourrooms-v0": 1.0, "Fourrooms-v1": 1.0, "HalfCheetah-v1": 0.9,
-        "Ant-v1": 0.8, "Ant-v2": 0.8, "BipedalWalker-v2": 1.0
+        "CartPole-v0": 1.0,
+        "Fourrooms-small-v0": 1.0,
+        "Fourrooms-medium-v0": 1.0,
+        "Fourrooms-large-v0": 1.0,
+        "HalfCheetah-v1": 0.9,
+        "Ant-v1": 0.8,
+        "Ant-v2": 0.8,
+        "BipedalWalker-v2": 1.0
     }
 
     num_batches_by_env = {
-        "CartPole-v0": 100, "Fourrooms-v0": 100, "Fourrooms-v1": 100, "HalfCheetah-v1": 1000,
-        "Ant-v1": 1000, "Ant-v2": 1000, "BipedalWalker-v2": 1000
+        "CartPole-v0": 100,
+        "Fourrooms-small-v0": 1000,
+        "Fourrooms-medium-v0": 1000,
+        "Fourrooms-large-v0": 1000,
+        "HalfCheetah-v1": 1000,
+        "Ant-v1": 1000,
+        "Ant-v2": 1000,
+        "BipedalWalker-v2": 1000
     }
 
     # TODO message: Jiayu, this is where you toggle doing viz or not
