@@ -384,8 +384,9 @@ class PolicyGradient(object):
                 last_record = 0
                 self.record()
 
-            # TODO: Message for Jiayu: This is the subpolicy viz code
-            if t == config.num_batches - 1 and config.visualize_sub_policies:
+            if t == config.num_batches - 1:
+                # poster
+                print("here")
                 logits = self.sess.run(self.sub_policies, feed_dict={
                     self.observation_placeholder: np.expand_dims(np.arange(81),
                                                                  axis=1)
@@ -393,18 +394,18 @@ class PolicyGradient(object):
                 plt.clf()
                 fig, axes = plt.subplots(1, 2)
 
-                left = 0
-                down = 1
-                right = 2
-                up = 3
-                block = -1
-                goal = -2
+                l = 0
+                d = 1
+                r = 2
+                u = 3
+                b = -1
+                g = -2
 
                 for sub in range(config.num_sub_policies):
                     actions = np.argmax(logits[:, sub, :], axis=1)
-                    map = [left, down, right, up]
+                    map = [l, d, r, u]
 
-                    grid_vector = [map[i] for i in actions]
+                    ret = [map[i] for i in actions]
 
                     room0 = [2, 10, 11, 12, 19, 20, 21, 28, 29, 30]
                     room1 = [14, 15, 16, 22, 23, 24, 25, 32, 33, 34]
@@ -415,12 +416,12 @@ class PolicyGradient(object):
 
                     for i in range(81):
                         if i not in indices:
-                            grid_vector[i] = block
+                            ret[i] = b
 
-                    grid_vector[2] = goal
-                    grid_vector[78] = goal
+                    ret[2] = g
+                    ret[78] = g
 
-                    grid = np.array_split(grid_vector, 9)
+                    data = np.array_split(ret, 9)
                     # create discrete colormaps
                     cmap = colors.ListedColormap(
                         ['green', 'black', 'red', 'blue', 'pink', 'cyan'])
@@ -428,7 +429,7 @@ class PolicyGradient(object):
                     norm = colors.BoundaryNorm(bounds, cmap.N)
 
                     ax = axes[sub % 2]
-                    ax.imshow(grid, cmap=cmap, norm=norm)
+                    ax.imshow(data, cmap=cmap, norm=norm)
                     ax.set_title('Sub Policy ' + str(sub))
 
                     # draw gridlines
@@ -439,7 +440,7 @@ class PolicyGradient(object):
                     ax.xaxis.set_ticklabels([])
                     ax.yaxis.set_ticklabels([])
                 plt.tight_layout()
-                plt.savefig(str(np.random.randint(0, 10000)) + ' test.png')
+                plt.savefig('test.png')
 
             if t % config.record_freq == 0:
                 self.save_model_checkpoint(self.sess, self.saver,
@@ -468,8 +469,7 @@ class PolicyGradient(object):
                                    range(config.num_sub_policies)],
                                   loc='upper left', prop={'size': 20})
             plt.tight_layout()
-            plt.savefig('Rooms and Subs ' + str(np.random.randint(0, 10000)),
-                        dpi=300)
+            plt.savefig('Rooms and Subs', dpi=300)
 
     def get_room_by_state(self, state):
         room0 = [2, 10, 11, 12, 19, 20, 21, 28, 29, 30]

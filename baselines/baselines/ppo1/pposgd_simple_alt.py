@@ -7,6 +7,7 @@ from baselines.common.mpi_adam import MpiAdam
 from baselines.common.mpi_moments import mpi_moments
 from mpi4py import MPI
 from collections import deque
+from config import config
 
 def traj_segment_generator(pi, env, horizon, stochastic):
     t = 0
@@ -91,7 +92,12 @@ def learn(env, policy_fn, *,
     # ----------------------------------------
     ob_space = env.observation_space
     ac_space = env.action_space
-    pi = policy_fn("pi", ob_space, ac_space) # Construct
+    with tf.variable_scope('pi', reuse=False):
+        pi = policy_fn("pi", ob_space, ac_space) # Construct
+        # network for new policy
+
+    with tf.variable_scope('pi', reuse=True):
+        pi_gen = policy_fn("pi_gen", ob_space, ac_space)
 
     oldpi = policy_fn("oldpi", ob_space, ac_space) # Network for old policy
     atarg = tf.placeholder(dtype=tf.float32, shape=[None]) # Target advantage function (if applicable)
@@ -131,8 +137,7 @@ def learn(env, policy_fn, *,
 
     # Prepare for rollouts
     # ----------------------------------------
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_actorbatch,
-                                     stochastic=True)
+    seg_gen = traj_segment_generator(pi_gen, env, timesteps_per_actorbatch, stochastic=True)
 
     episodes_so_far = 0
     timesteps_so_far = 0
