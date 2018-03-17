@@ -127,18 +127,6 @@ class PolicyGradient(object):
 
     def add_optimizer_op(self):
         self.network_opt = tf.train.AdamOptimizer(learning_rate=self.lr)
-        # TODO: james - i have defined a number of train ops here that you can
-        # TODO: potentially use to only train the sub or only train the master
-        # TODO: during any time steps
-
-        self.train_master_op = self.network_opt.minimize(self.loss,
-                                                         var_list=tf.get_collection(
-                                                             tf.GraphKeys.TRAINABLE_VARIABLES,
-                                                             scope='master'))
-        self.train_subpolicy_op = self.network_opt.minimize(self.loss,
-                                                            var_list=tf.get_collection(
-                                                                tf.GraphKeys.TRAINABLE_VARIABLES,
-                                                                scope='subpolicy'))
 
         if config.freeze_sub_policy:
             self.train_op = self.network_opt.minimize(self.loss,

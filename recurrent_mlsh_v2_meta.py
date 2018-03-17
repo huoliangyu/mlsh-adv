@@ -3,11 +3,8 @@ import tensorflow.contrib.rnn as rnn
 from pg import *
 
 
-class RecurrentMLSHV2(PolicyGradient):
-    def policy_network(self, mlp_input, output_size, scope,
-                       size=config.baseline_layer_size,
-                       n_layers=config.n_layers, output_activation=None):
-
+class RecurrentMLSHV2META(PolicyGradient):
+    def sub_policies(self, mlp_input):
         if str(config.env_name).startswith("Fourrooms"):
             self.state_embedding = tf.tile(
                 tf.one_hot(indices=tf.cast(mlp_input, dtype=tf.int32),
@@ -25,10 +22,13 @@ class RecurrentMLSHV2(PolicyGradient):
                                                       inputs=self.state_embedding,
                                                       dtype=tf.float32,
                                                       scope='subpolicy')
+        return self.sub_policies
+
+    def master_policy(self, sub_policies):
 
         lstm_cell = rnn.BasicLSTMCell(num_units=config.num_sub_policies)
 
-        self.proposed_sub_policies = self.sub_policies
+        self.proposed_sub_policies = sub_policies
 
         concatenated = tf.concat(
             [self.proposed_sub_policies, self.state_embedding], axis=2)
@@ -59,5 +59,5 @@ if __name__ == "__main__":
 
     env = gym.make(config.env_name)
     config = config('RecurrentMLSH-v2')
-    model = RecurrentMLSHV2(env, config)
+    model = RecurrentMLSHV2META(env, config)
     model.run()
