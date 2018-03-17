@@ -107,8 +107,8 @@ class Fourrooms(discrete.DiscreteEnv):
         self.desc = desc = np.asarray(desc, dtype='c')
         self.nrow, self.ncol = nrow, ncol = desc.shape
 
-        nA = 4
-        nS = nrow * ncol
+        self.nA = nA = 4
+        self.nS = nS = nrow * ncol
 
         self.do_not_randomly_reset = False
 
@@ -176,47 +176,45 @@ class Fourrooms(discrete.DiscreteEnv):
         # print np.array_split(self.gsd_all, nrow)
         # print '-------------------'
 
-        P = {s: {a: [] for a in range(nA)} for s in range(nS)}
+        P = self.generate_transitions()
 
-        def to_s(row, col):
-            return row * ncol + col
+        super(Fourrooms, self).__init__(nS, nA, P, self.isd)
 
-        def inc(row, col, a):
-            orig_row = row
-            orig_col = col
-            if a == 0:  # left
-                col = max(col - 1, 0)
-            elif a == 1:  # down
-                row = min(row + 1, nrow - 1)
-            elif a == 2:  # right
-                col = min(col + 1, ncol - 1)
-            elif a == 3:  # up
-                row = max(row - 1, 0)
-            is_wall = (desc[row][col] == b'X' and to_s(row, col) != self.goal)
-            if is_wall:
-                return (orig_row, orig_col)
-            return (row, col)
+    def to_s(self, row, col):
+        return row * self.ncol + col
 
-        for row in range(nrow):
-            for col in range(ncol):
-                s = to_s(row, col)
-                for a in range(nA):
+    def inc(self, row, col, a):
+        orig_row = row
+        orig_col = col
+        if a == 0:  # left
+            col = max(col - 1, 0)
+        elif a == 1:  # down
+            row = min(row + 1, self.nrow - 1)
+        elif a == 2:  # right
+            col = min(col + 1, self.ncol - 1)
+        elif a == 3:  # up
+            row = max(row - 1, 0)
+        is_wall = (self.desc[row][col] == b'X' and self.to_s(row, col) != self.goal)
+        if is_wall:
+            return (orig_row, orig_col)
+        return (row, col)
+
+    def generate_transitions(self):
+        P = {s: {a: [] for a in range(self.nA)} for s in range(self.nS)}
+        for row in range(self.nrow):
+            for col in range(self.ncol):
+                s = self.to_s(row, col)
+                for a in range(self.nA):
                     li = P[s][a]
-                    letter = desc[row, col]
 
-                    # if letter in b'G':
                     if s == self.goal:
                         li.append((1.0, s, 0, True))
                     else:
                         # TODO(yejiayu): Add stochastic case.
-                        newrow, newcol = inc(row, col, a)
-                        newstate = to_s(newrow, newcol)
-                        newletter = desc[newrow, newcol]
-                        # done = bytes(newletter) in b'GH'
+                        newrow, newcol = self.inc(row, col, a)
+                        newstate = self.to_s(newrow, newcol)
                         done = (newstate == self.goal)
-                        # rew = float(newletter == b'G') * 100 - 1
-                        # rew = float(newletter == b'G') * nrow * ncol - 1
-                        rew = (newstate == self.goal) * nrow * ncol - 1
+                        rew = (newstate == self.goal) * self.nrow * self.ncol - 1
                         li.append((1.0, newstate, rew, done))
 
 
@@ -224,8 +222,7 @@ class Fourrooms(discrete.DiscreteEnv):
         # print P
         # print '-------------------'
 
-        super(Fourrooms, self).__init__(nS, nA, P, self.isd)
-
+        return P
 
     # Hack: use seed as a map of code
     def reset(self, seed=None):
@@ -245,6 +242,8 @@ class Fourrooms(discrete.DiscreteEnv):
         elif 'fixedgoal' in seed:
 
             self.goal = seed['fixedgoal']
+            self.P = self.generate_transitions()
+
             self.start = sample_from_ones(self.isd_all)
             while self.start == self.goal:
                 self.start = sample_from_ones(self.isd_all)
@@ -275,6 +274,7 @@ class Fourrooms(discrete.DiscreteEnv):
 
             self.start = seed['fixedstart+goal:start']
             self.goal = seed['fixedstart+goal:goal']
+            self.P = self.generate_transitions()
             self.lastaction=None
 
             print '---------------------------------'
@@ -311,6 +311,7 @@ class Fourrooms(discrete.DiscreteEnv):
             # not needed
             # while self.goal == self.start:
             #     self.goal = sample_from_ones(self.gsd_edge)
+            self.P = self.generate_transitions()
 
             print '---------------------------------'
             print 'using seed = %s' % seed['goal-on-edge']
@@ -329,6 +330,7 @@ class Fourrooms(discrete.DiscreteEnv):
             self.goal = sample_from_ones(self.gsd_all)
             while self.goal == self.start:
                 self.goal = sample_from_ones(self.gsd_edge)
+            self.P = self.generate_transitions()
 
             print '---------------------------------'
             print 'using seed = %s' % seed['goal-on-all']
@@ -348,6 +350,7 @@ class Fourrooms(discrete.DiscreteEnv):
             # not needed
             # while self.goal == self.start:
             #     self.goal = sample_from_ones(self.gsd_edge)
+            self.P = self.generate_transitions()
 
             print '---------------------------------'
             print 'using seed = %s' % seed['start+goal-on-edge']
@@ -366,6 +369,7 @@ class Fourrooms(discrete.DiscreteEnv):
             self.goal = sample_from_ones(self.gsd_all)
             while self.goal == self.start:
                 self.goal = sample_from_ones(self.gsd_edge)
+            self.P = self.generate_transitions()
 
             print '---------------------------------'
             print 'using seed = %s' % seed['start+goal-on-all']

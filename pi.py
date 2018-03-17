@@ -43,6 +43,8 @@ def policy_evaluation(P, nS, nA, policy, gamma=0.9, max_iteration=1000, tol=1e-3
     ############################
     # YOUR IMPLEMENTATION HERE #
     ############################
+    # print P
+
     V = np.zeros(nS)
     # print 'V = %s' % V
     for num_iter in xrange(max_iteration):
@@ -179,7 +181,6 @@ def randomize_fourrooms_task(env):
   # env.reset(seed={'goal-on-edge':234})
   # env.reset(seed={'goal-on-all':22})
   # env.reset(seed={'start+goal-on-edge':234})
-  # env.reset(seed={'start+goal-on-all':234})
   env.reset(seed={'start+goal-on-all':234})
 
 # Feel free to run your own debug code in main!
@@ -188,13 +189,13 @@ if __name__ == "__main__":
   if not os.path.exists('./plots'):
     os.makedirs('./plots')
 
-  # env = gym.make('Fourrooms-small-v0')
-  # randomize_fourrooms_task(env)
-  # V_pi, p_pi, niter_pi = policy_iteration(env.P, env.nS, env.nA, gamma=1.0, max_iteration=1000, tol=1e-3)
-
-  env = gym.make('Fourrooms-medium-v0')
+  env = gym.make('Fourrooms-small-v0')
   randomize_fourrooms_task(env)
   V_pi, p_pi, niter_pi = policy_iteration(env.P, env.nS, env.nA, gamma=1.0, max_iteration=1000, tol=1e-3)
+
+  # env = gym.make('Fourrooms-medium-v0')
+  # randomize_fourrooms_task(env)
+  # V_pi, p_pi, niter_pi = policy_iteration(env.P, env.nS, env.nA, gamma=1.0, max_iteration=1000, tol=1e-3)
 
   # env = gym.make('Fourrooms-large-v0')
   # randomize_fourrooms_task(env)
