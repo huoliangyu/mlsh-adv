@@ -353,8 +353,8 @@ class PolicyGradient(object):
         if self.config.do_meta_learning:
             num_tasks = self.config.num_meta_learning_training_tasks
 
-        old = self.sess.run(tf.get_collection(
-            tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
+        # old = self.sess.run(tf.get_collection(
+        #     tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
 
         print 'self.config.do_meta_learning = %s' % self.config.do_meta_learning
         print 'num_tasks = %s' % num_tasks
@@ -388,8 +388,8 @@ class PolicyGradient(object):
                 if self.config.use_baseline:
                     self.update_baseline(returns, observations)
 
-                old = self.sess.run(tf.get_collection(
-                    tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
+                # old = self.sess.run(tf.get_collection(
+                #     tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
 
                 self.sess.run(self.train_op, feed_dict={
                     self.observation_placeholder: observations,
@@ -397,8 +397,8 @@ class PolicyGradient(object):
                     self.advantage_placeholder: advantages
                 })
 
-                old = self.sess.run(tf.get_collection(
-                    tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
+                # old = self.sess.run(tf.get_collection(
+                #     tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
 
                 if t % self.config.summary_freq == 0:
                     self.update_averages(total_rewards, scores_eval)

@@ -1,4 +1,3 @@
-import numpy as np
 import tensorflow as tf
 
 
@@ -54,9 +53,9 @@ class config():
     # env_name = "CartPole-v0"
     # env_name = 'BipedalWalker-v2'
     # env_name = "InvertedPendulum-v1"
-    env_name = "Fourrooms-small-v0"
+    # env_name = "Fourrooms-small-v0"
     # env_name = "Fourrooms-medium-v0"
-    # env_name = "Fourrooms-large-v0"
+    env_name = "Fourrooms-large-v0"
 
     # env_name = "HalfCheetah-v1"
     # env_name = "Ant-v1"
@@ -104,7 +103,7 @@ class config():
         "CartPole-v0": 100,
         "Fourrooms-small-v0": 1000,
         "Fourrooms-medium-v0": 1000,
-        "Fourrooms-large-v0": 1000,
+        "Fourrooms-large-v0": 5,
         "HalfCheetah-v1": 1000,
         "Ant-v1": 1000,
         "Ant-v2": 1000,
@@ -116,12 +115,8 @@ class config():
     visualize_sub_policies = True
 
     # recover_checkpoint_path = None
-    recover_checkpoint_path = \
-        "results/Fourrooms-v0-bs=1000-algo=RecurrentMLSH-v2-usebaseline=True" \
-        "-lr=0.03-baselinelayers=4x32-num_sub=2-maxeps=0.0-mineps=0.0" \
-        "-sub_index=-1-freezesub=False-uniquestr=d-numsublayers=1" \
-        "-nummasterlayers=1-max_num_sub=4-wa=False-sub_net=LSTM-master_net" \
-        "=LSTM/model.ckpt-9"
+    recover_checkpoint_path = "results/Fourrooms-large-v0-bs=1000-algo" \
+                              "=RecurrentMLSH-v2-usebaseline=True-lr=0.03-baselinelayers=4x32-num_sub=2-maxeps=0.0-mineps=0.0-sub_index=-1-freezesub=False-uniquestr=d-numsublayers=1-nummasterlayers=1-max_num_sub=4-wa=False-sub_net=LSTM-master_net=LSTM/model.ckpt-4"
 
     record = False
     unique_key = "d"
