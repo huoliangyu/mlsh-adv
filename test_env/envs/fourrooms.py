@@ -274,7 +274,7 @@ class Fourrooms(discrete.DiscreteEnv):
         elif 'fixedstart+goal:start' in seed:
 
             self.start = seed['fixedstart+goal:start']
-            self.goal = seed['fixedgoal+goal:goal']
+            self.goal = seed['fixedstart+goal:goal']
             self.lastaction=None
 
             print '---------------------------------'

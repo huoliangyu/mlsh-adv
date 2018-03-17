@@ -157,11 +157,14 @@ def extract_policy(env, Q, gamma=1.0):
   return extracted_policy
 
 def randomize_fourrooms_task(env):
+  nrow, ncol = env.desc.shape
+
   # env.reset(seed={'start':234})
+  env.reset(seed={'fixedstart+goal:start':(1 + ncol), 'fixedstart+goal:goal':(env.nS -3)})
   # env.reset(seed={'goal-on-edge':234})
   # env.reset(seed={'goal-on-all':22})
   # env.reset(seed={'start+goal-on-edge':234})
-  env.reset(seed={'start+goal-on-all':234})
+  # env.reset(seed={'start+goal-on-all':234})
   # env.reset(seed={'start+goal-on-all':234})
 
 # Feel free to run your own debug code in main!
