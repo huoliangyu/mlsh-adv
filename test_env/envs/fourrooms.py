@@ -19,7 +19,7 @@ UP = 3
 
 MAPS = {
     "small": [
-        "XXGXXXXXX",
+        "XXXXXXXXX",
         "XOOOXOOOX",
         "XOOOOOOOX",
         "XOOOXOOOX",
@@ -69,6 +69,10 @@ MAPS = {
     ],
 }
 
+def sample_from_ones(dist):
+    # print dist
+    # print np.nonzero(dist)[0]
+    return np.random.choice(np.nonzero(dist)[0])
 
 class Fourrooms(discrete.DiscreteEnv):
     """
@@ -106,6 +110,8 @@ class Fourrooms(discrete.DiscreteEnv):
         nA = 4
         nS = nrow * ncol
 
+        self.do_not_randomly_reset = False
+
         self.goal = 2
         self.start = nS - self.ncol - 2
 
@@ -117,11 +123,38 @@ class Fourrooms(discrete.DiscreteEnv):
         # print 'self.start / nrow = %s' % (self.start / nrow)
         # print 'self.start / ncol = %s' % (self.start / ncol)
 
-        desc[self.start / nrow][self.start % ncol] = 'S'
-        desc[self.goal / nrow][self.goal % ncol] = 'G'
 
-        isd = np.array(desc == b'S').astype('float64').ravel()
-        isd[self.start] = 1.0
+        self.isd_all = np.array(desc == b'O').astype('float64').ravel()
+        self.gsd_edge = np.array(desc == b'X').astype('float64').ravel()
+        # exclude goal on not-reachable-part
+        self.gsd_edge[0] = 0
+        self.gsd_edge[ncol - 1] = 0
+        self.gsd_edge[nS - ncol] = 0
+        self.gsd_edge[nS - 1] = 0
+        self.gsd_edge[(ncol - 1) / 2] = 0
+        self.gsd_edge[(nS - 1) / 2] = 0
+        self.gsd_edge[ncol * (nrow - 1) / 2] = 0
+        self.gsd_edge[ncol * (nrow - 1) / 2 + ncol - 1] = 0
+        self.gsd_edge[nS - 1 - (ncol - 1) / 2] = 0
+
+        self.gsd_all = np.ones_like(desc).astype('float64').ravel()
+        # exclude goal on edge
+        self.gsd_all[0] = 0
+        self.gsd_all[ncol - 1] = 0
+        self.gsd_all[nS - ncol] = 0
+        self.gsd_all[nS - 1] = 0
+        self.gsd_all[(ncol - 1) / 2] = 0
+        self.gsd_all[(nS - 1) / 2] = 0
+        self.gsd_all[ncol * (nrow - 1) / 2] = 0
+        self.gsd_all[ncol * (nrow - 1) / 2 + ncol - 1] = 0
+        self.gsd_all[nS - 1 - (ncol - 1) / 2] = 0
+
+        # desc[self.start / nrow][self.start % ncol] = 'S'
+        # desc[self.goal / nrow][self.goal % ncol] = 'G'
+
+        # self.isd = np.array(desc == b'S').astype('float64').ravel()
+        self.isd = np.zeros(desc.shape).astype('float64').ravel()
+        self.isd[self.start] = 1.0
 
         # print '-------------------'
         # print desc
@@ -132,9 +165,15 @@ class Fourrooms(discrete.DiscreteEnv):
         # print '-------------------'
         # print np.array(desc == b'S').astype('float64').ravel()
         # print '-------------------'
-        # print isd
+        # print self.isd
         # print '-------------------'
-        # print np.array_split(isd, nrow)
+        # print np.array_split(self.isd, nrow)
+        # print '-------------------'
+        # print np.array_split(self.isd_all, nrow)
+        # print '-------------------'
+        # print np.array_split(self.gsd_edge, nrow)
+        # print '-------------------'
+        # print np.array_split(self.gsd_all, nrow)
         # print '-------------------'
 
         P = {s: {a: [] for a in range(nA)} for s in range(nS)}
@@ -153,7 +192,7 @@ class Fourrooms(discrete.DiscreteEnv):
                 col = min(col + 1, ncol - 1)
             elif a == 3:  # up
                 row = max(row - 1, 0)
-            is_wall = desc[row][col] == b'X'
+            is_wall = (desc[row][col] == b'X' and to_s(row, col) != self.goal)
             if is_wall:
                 return (orig_row, orig_col)
             return (row, col)
@@ -165,16 +204,19 @@ class Fourrooms(discrete.DiscreteEnv):
                     li = P[s][a]
                     letter = desc[row, col]
 
-                    if letter in b'G':
-                    # if s == self.goal:
+                    # if letter in b'G':
+                    if s == self.goal:
                         li.append((1.0, s, 0, True))
                     else:
                         # TODO(yejiayu): Add stochastic case.
                         newrow, newcol = inc(row, col, a)
                         newstate = to_s(newrow, newcol)
                         newletter = desc[newrow, newcol]
-                        done = bytes(newletter) in b'GH'
-                        rew = float(newletter == b'G') * 100 - 1
+                        # done = bytes(newletter) in b'GH'
+                        done = (newstate == self.goal)
+                        # rew = float(newletter == b'G') * 100 - 1
+                        # rew = float(newletter == b'G') * nrow * ncol - 1
+                        rew = (newstate == self.goal) * nrow * ncol - 1
                         li.append((1.0, newstate, rew, done))
 
 
@@ -182,11 +224,166 @@ class Fourrooms(discrete.DiscreteEnv):
         # print P
         # print '-------------------'
 
-        super(Fourrooms, self).__init__(nS, nA, P, isd)
+        super(Fourrooms, self).__init__(nS, nA, P, self.isd)
 
+
+    # Hack: use seed as a map of code
     def reset(self, seed=None):
-        np.random.seed(seed)
-        return super(Fourrooms, self).reset()
+        # print 'seed=%s' % seed
+        if seed is None:
+            if self.do_not_randomly_reset:
+                self.s = self.start
+                self.lastaction=None
+                print '---------------------------------'
+                print 'setting start = %s' % self.start
+                print 'setting goal = %s' % self.goal
+                print '---------------------------------'
+                return self.s
+
+            return super(Fourrooms, self).reset()
+
+        elif 'fixedgoal' in seed:
+
+            self.goal = seed['fixedgoal']
+            self.start = sample_from_ones(self.isd_all)
+            while self.start == self.goal:
+                self.start = sample_from_ones(self.isd_all)
+            self.lastaction=None
+
+            print '---------------------------------'
+            print 'setting start = %s' % self.start
+            print 'setting goal = %s' % self.goal
+            print '---------------------------------'
+            self.s = self.start
+            self.do_not_randomly_reset = True
+            return self.s
+
+        elif 'fixedstart' in seed:
+
+            self.start = seed['fixedstart']
+            self.lastaction=None
+
+            print '---------------------------------'
+            print 'setting start = %s' % self.start
+            print 'setting goal = %s' % self.goal
+            print '---------------------------------'
+            self.s = self.start
+            self.do_not_randomly_reset = True
+            return self.s
+
+        elif 'fixedstart+goal:start' in seed:
+
+            self.start = seed['fixedstart+goal:start']
+            self.goal = seed['fixedgoal+goal:goal']
+            self.lastaction=None
+
+            print '---------------------------------'
+            print 'setting start = %s' % self.start
+            print 'setting goal = %s' % self.goal
+            print '---------------------------------'
+            self.s = self.start
+            self.do_not_randomly_reset = True
+            return self.s
+
+        elif 'start' in seed:
+            np.random.seed(seed['start'])
+
+            self.start = sample_from_ones(self.isd_all)
+            while self.start == self.goal:
+                self.start = sample_from_ones(self.isd_all)
+            self.lastaction=None
+
+            print '---------------------------------'
+            print 'using seed = %s' % seed['start']
+            print 'setting start = %s' % self.start
+            print 'setting goal = %s' % self.goal
+            print '---------------------------------'
+            self.s = self.start
+            self.do_not_randomly_reset = True
+            return self.s
+
+        elif 'goal-on-edge' in seed:
+            np.random.seed(seed['goal-on-edge'])
+
+            self.start = sample_from_ones(self.isd, self)
+            self.lastaction=None
+            self.goal = sample_from_ones(self.gsd_edge)
+            # not needed
+            # while self.goal == self.start:
+            #     self.goal = sample_from_ones(self.gsd_edge)
+
+            print '---------------------------------'
+            print 'using seed = %s' % seed['goal-on-edge']
+            print 'setting start = %s' % self.start
+            print 'setting goal = %s' % self.goal
+            print '---------------------------------'
+            self.s = self.start
+            self.do_not_randomly_reset = True
+            return self.s
+
+        elif 'goal-on-all' in seed:
+            np.random.seed(seed['goal-on-all'])
+
+            self.start = sample_from_ones(self.isd)
+            self.lastaction=None
+            self.goal = sample_from_ones(self.gsd_all)
+            while self.goal == self.start:
+                self.goal = sample_from_ones(self.gsd_edge)
+
+            print '---------------------------------'
+            print 'using seed = %s' % seed['goal-on-all']
+            print 'setting start = %s' % self.start
+            print 'setting goal = %s' % self.goal
+            print '---------------------------------'
+            self.s = self.start
+            self.do_not_randomly_reset = True
+            return self.s
+
+        elif 'start+goal-on-edge' in seed:
+            np.random.seed(seed['start+goal-on-edge'])
+
+            self.start = sample_from_ones(self.isd_all)
+            self.lastaction=None
+            self.goal = sample_from_ones(self.gsd_edge)
+            # not needed
+            # while self.goal == self.start:
+            #     self.goal = sample_from_ones(self.gsd_edge)
+
+            print '---------------------------------'
+            print 'using seed = %s' % seed['start+goal-on-edge']
+            print 'setting start = %s' % self.start
+            print 'setting goal = %s' % self.goal
+            print '---------------------------------'
+            self.s = self.start
+            self.do_not_randomly_reset = True
+            return self.s
+
+        elif 'start+goal-on-all' in seed:
+            np.random.seed(seed['start+goal-on-all'])
+
+            self.start = sample_from_ones(self.isd_all)
+            self.lastaction=None
+            self.goal = sample_from_ones(self.gsd_all)
+            while self.goal == self.start:
+                self.goal = sample_from_ones(self.gsd_edge)
+
+            print '---------------------------------'
+            print 'using seed = %s' % seed['start+goal-on-all']
+            print 'setting start = %s' % self.start
+            print 'setting goal = %s' % self.goal
+            print '---------------------------------'
+            self.s = self.start
+            self.do_not_randomly_reset = True
+            return self.s
+
+        else:
+            raise ValueError('invalid seed specifi`ion: %s' % seed)
+
+    # def randomizeCorrect(self):
+    #     # self.realgoal = np.random.choice([68, 69, 70, 71, 72, 78, 79, 80, 81, 82, 88, 89, 90, 91, 92, 93, 99, 100, 101, 102, 103])
+    #     self.realgoal = np.random.choice([68, 80, 90, 103])
+    #     self.realgoal = 103
+    #     pass
 
     def _render(self, mode='human', close=False):
         if close:

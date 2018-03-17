@@ -7,6 +7,7 @@ import time
 import datetime
 import matplotlib.pyplot as plt
 from matplotlib import colors
+from visualize import visualize_fourrooms_policy
 from test_env import *
 
 def eps_greedy_policy(Q, eps, s, nA):
@@ -155,108 +156,36 @@ def extract_policy(env, Q, gamma=1.0):
 
   return extracted_policy
 
-def visualize_policy(env, policy):
-  nrow, ncol = env.desc.shape
-
-  # data = np.random.rand(10, 10) * 20
-  # 0: left
-  # 1: down
-  # 2: right
-  # 3: up
-  l = 0
-  d = 1
-  r = 2
-  u = 3
-  # boundary
-  b = -1
-  # goal
-  g = -2
-
-          # "XXGXXXXXX",
-          # "XOOOXOOOX",
-          # "XOOOOOOOX",
-          # "XOOOXOOOX",
-          # "XXOXXXOXX",
-          # "XOOOXOOOX",
-          # "XOOOOOOOX",
-          # "XOOOXOOOX",
-          # "XXXXXXXXX",
-  # data = [
-  #     [b, b, g, b, b, b, b, b, b],
-  #     [b, r, u, l, b, d, d, d, b],
-  #     [b, r, u, l, l, l, l, l, b],
-  #     [b, r, u, l, b, u, u, u, b],
-  #     [b, b, u, b, b, b, u, b, b],
-  #     [b, r, u, l, b, d, d, d, b],
-  #     [b, r, u, l, l, l, l, l, b],
-  #     [b, r, u, l, b, u, u, u, b],
-  #     [b, b, b, b, b, b, b, b, b],
-  # ]
-
-  # print '-----------------------------'
-  # print env.desc
-  # print '-----------------------------'
-  policy[env.goal] = g
-  for s in xrange(env.nS):
-    if env.desc[s / nrow][s % ncol] in b'X':
-      policy[s] = -1
-
-  data = np.array_split(policy, nrow)
-
-  # print(data)
-
-  # create discrete colormap
-  cmap = colors.ListedColormap(['green', 'black', 'red', 'blue', 'pink', 'cyan'])
-  bounds = [-2,-1,0,1,2,3,4]
-  norm = colors.BoundaryNorm(bounds, cmap.N)
-
-  fig, ax = plt.subplots()
-  ax.imshow(data, cmap=cmap, norm=norm)
-
-  # draw gridlines
-  ax.grid(which='major', axis='both', linestyle='-', color='k', linewidth=2)
-  ax.set_xticks(np.arange(-.5, ncol, 1));
-  ax.set_yticks(np.arange(-.5, nrow, 1));
-  # ax.set_xticks([]);
-  # ax.set_yticks([]);
-  # plt.axis('off')
-  # https://stackoverflow.com/questions/2176424/hiding-axis-text-in-matplotlib-plots
-  ax.xaxis.set_ticklabels([])
-  ax.yaxis.set_ticklabels([])
-
-  print 'data ='
-  print data
-
-  # plt.text(-0.5, -0.5, 'u', fontsize=12)
-  # plt.text(2.5, 2.5, 'd', fontsize=12)
-  # plt.text(9, 9, 'l', fontsize=12)
-  direction = {-2:'g', -1:'b', 0:u'\u2190', 1:u'\u2193', 2:u'\u2192', 3:u'\u2191'}
-  for r in xrange(nrow):
-    for c in xrange(ncol):
-      if env.desc[r][c] not in b'XG':
-        plt.text(c - 0.2, r + 0.2, direction[data[r][c]], fontsize=12, color='white')
-
-  # plt.show()
-  plt.savefig('plots/fourrooms_tabq_subpolicies_%s.png' % get_timestamp())
+def randomize_fourrooms_task(env):
+  # env.reset(seed={'start':234})
+  # env.reset(seed={'goal-on-edge':234})
+  # env.reset(seed={'goal-on-all':22})
+  # env.reset(seed={'start+goal-on-edge':234})
+  env.reset(seed={'start+goal-on-all':234})
+  # env.reset(seed={'start+goal-on-all':234})
 
 # Feel free to run your own debug code in main!
 def main():
   if not os.path.exists('./plots'):
     os.makedirs('./plots')
-  env = gym.make('Fourrooms-small-v0')
-  Q = learn_Q_QLearning(env, num_episodes=10000, e=1.0, gamma=1.0, lr=0.3, decay_rate=0.92)
+
+  # env = gym.make('Fourrooms-small-v0')
+  # randomize_fourrooms_task(env)
+  # Q = learn_Q_QLearning(env, num_episodes=10000, e=1.0, gamma=1.0, lr=0.3, decay_rate=0.92)
 
   # env = gym.make('Fourrooms-medium-v0')
+  # randomize_fourrooms_task(env)
   # Q = learn_Q_QLearning(env, num_episodes=20000, e=1.0, gamma=1.0, lr=0.3, decay_rate=0.92)
 
-  # env = gym.make('Fourrooms-large-v0')
-  # Q = learn_Q_QLearning(env, num_episodes=100000, e=1.0, gamma=1.0, lr=0.3, decay_rate=0.92)
+  env = gym.make('Fourrooms-large-v0')
+  randomize_fourrooms_task(env)
+  Q = learn_Q_QLearning(env, num_episodes=10000, e=1.0, gamma=1.0, lr=0.3, decay_rate=0.92)
 
   print('Q =\n%s' % Q)
   # render_single_Q(env, Q)
   optimal_policy = extract_policy(env, Q)
   print('optimal_policy =\n%s' % optimal_policy)
-  visualize_policy(env, optimal_policy)
+  visualize_fourrooms_policy(env, optimal_policy)
 
 if __name__ == '__main__':
     main()
