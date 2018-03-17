@@ -21,7 +21,8 @@ class config():
         #                      self.num_sub_policies, self.max_epsilon,
         #                      self.min_epsilon, self.sub_policy_index,
         #                      self.freeze_sub_policy, self.unique_key,
-        #                      self.num_sub_policy_layers, self.num_master_layers,
+        #                      self.num_sub_policy_layers,
+        # self.num_master_layers,
         #                      self.max_num_sub_policies, self.weight_average,
         #                      self.sub_policy_network, self.master_network)
 
@@ -29,7 +30,7 @@ class config():
                       "-baselinelayers=%sx%s-num_sub=%s-maxeps=%s-min" \
                       "eps=%s-sub_index=%s-freezesub=%s-uniquestr" \
                       "=%s-numsublayers=%s-nummasterlayers=%s-max_num_sub" \
-                      "=%s-weighted_avg=%s-sub_net=%s" \
+                      "=%s-wa=%s-sub_net=%s" \
                       "-master_net=%s" \
                       "/" % (self.env_name, self.batch_size, self.algorithm,
                              self.use_baseline, self.learning_rate,
@@ -48,7 +49,7 @@ class config():
         self.output_path = output_path
 
     do_meta_learning = True
-    num_meta_learning_training_tasks = 20
+    num_meta_learning_training_tasks = 1
 
     # env_name = "CartPole-v0"
     # env_name = 'BipedalWalker-v2'
@@ -65,44 +66,47 @@ class config():
         # return "Fourrooms-v0"
 
     batch_size_by_env = {
-        "CartPole-v0": 64, "Fourrooms-v0": 1000,"Fourrooms-v1": 1000, "HalfCheetah-v1": 50000, \
-        "Ant-v1": 100000, "Ant-v2": 64, "BipedalWalker-v2": 256
+        "CartPole-v0": 64, "Fourrooms-v0": 1000, "Fourrooms-v1": 1000,
+        "HalfCheetah-v1": 50000, "Ant-v1": 100000, "Ant-v2": 64,
+        "BipedalWalker-v2": 256
     }
 
     lr_by_env = {
-        "CartPole-v0": 3e-2, "Fourrooms-v0": 3e-2, "Fourrooms-v1": 3e-2, "HalfCheetah-v1": 3e-2,
-        "Ant-v1": 3e-2, "Ant-v2": 3e-2, "BipedalWalker-v2": 3e-2
+        "CartPole-v0": 3e-2, "Fourrooms-v0": 3e-2, "Fourrooms-v1": 3e-2,
+        "HalfCheetah-v1": 3e-2, "Ant-v1": 3e-2, "Ant-v2": 3e-2,
+        "BipedalWalker-v2": 3e-2
     }
 
     gamma_by_env = {
-        "CartPole-v0": 1.0, "Fourrooms-v0": 1.0, "Fourrooms-v1": 1.0, "HalfCheetah-v1": 0.9,
-        "Ant-v1": 0.8, "Ant-v2": 0.8, "BipedalWalker-v2": 1.0
+        "CartPole-v0": 1.0, "Fourrooms-v0": 1.0, "Fourrooms-v1": 1.0,
+        "HalfCheetah-v1": 0.9, "Ant-v1": 0.8, "Ant-v2": 0.8,
+        "BipedalWalker-v2": 1.0
     }
 
     num_batches_by_env = {
-        "CartPole-v0": 100, "Fourrooms-v0": 100, "Fourrooms-v1": 100, "HalfCheetah-v1": 1000,
-        "Ant-v1": 1000, "Ant-v2": 1000, "BipedalWalker-v2": 1000
+        "CartPole-v0": 100, "Fourrooms-v0": 10, "Fourrooms-v1": 100,
+        "HalfCheetah-v1": 1000, "Ant-v1": 1000, "Ant-v2": 1000,
+        "BipedalWalker-v2": 1000
     }
 
     # TODO message: Jiayu, this is where you toggle doing viz or not
     visualize_master_policy = True
     visualize_sub_policies = True
 
-    recover_checkpoint_path = None
-    # recover_checkpoint_path = \
-    #     "results/Fourrooms-v1-bs=1000-algo=RecurrentMLSH-v2-usebaseline=True" \
-    #                           "-lr=0.03-baselinelayers=4x32-num_sub=2-maxeps" \
-    #     "=0.0-mineps=0.0" \
-    #                           "-sub_index=-1-freezesub=False-uniquestr=j-numsublayers=4" \
-    #                           "-nummasterlayers=4-max_num_sub=4-weighted_avg" \
-    #     "=False-sub_net=LSTM" \
-    #                           "-master_net=LSTM/model.ckpt-100"
+    # recover_checkpoint_path = None
+    recover_checkpoint_path = \
+        "results/Fourrooms-v0-bs=1000-algo=RecurrentMLSH-v2-usebaseline=True" \
+        "-lr=0.03-baselinelayers=4x32-num_sub=2-maxeps=0.0-mineps=0.0" \
+        "-sub_index=-1-freezesub=False-uniquestr=d-numsublayers=1" \
+        "-nummasterlayers=1-max_num_sub=4-wa=False-sub_net=LSTM-master_net" \
+        "=LSTM/model.ckpt-9"
+
     record = False
     unique_key = "d"
     render = False
     max_epsilon = 0.0
     min_epsilon = 0.0
-    freeze_sub_policy = False
+    freeze_sub_policy = True
     sub_policy_index = -1  # -1 means activates master policy
     num_batches = num_batches_by_env[env_name]
     batch_size = batch_size_by_env[env_name]

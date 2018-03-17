@@ -28,11 +28,7 @@ class RecurrentMLSHV2(PolicyGradient):
 
         lstm_cell = rnn.BasicLSTMCell(num_units=config.num_sub_policies)
 
-        if config.freeze_sub_policy:
-            self.proposed_sub_policies = tf.stop_gradient(self.sub_policies,
-                                                          'stop')
-        else:
-            self.proposed_sub_policies = self.sub_policies
+        self.proposed_sub_policies = self.sub_policies
 
         concatenated = tf.concat(
             [self.proposed_sub_policies, self.state_embedding], axis=2)
