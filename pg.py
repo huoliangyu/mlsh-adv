@@ -1,7 +1,6 @@
+import datetime
 import os
 import time
-import datetime
-
 from collections import Counter
 
 import gym
@@ -15,8 +14,10 @@ from config import config
 from test_env import *
 from utils.general import export_plot, get_logger
 
+
 def get_timestamp():
-  return datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d%H%M%S')
+    return datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d%H%M%S')
+
 
 class PolicyGradient(object):
     def save_model_checkpoint(self, session, saver, filename, epoch_num):
@@ -126,7 +127,13 @@ class PolicyGradient(object):
 
     def add_optimizer_op(self):
         self.network_opt = tf.train.AdamOptimizer(learning_rate=self.lr)
-        self.train_op = self.network_opt.minimize(self.loss)
+        if config.freeze_sub_policy:
+            self.train_op = self.network_opt.minimize(self.loss,
+                                                      var_list=tf.get_collection(
+                                                          tf.GraphKeys.TRAINABLE_VARIABLES,
+                                                          scope='master'))
+        else:
+            self.train_op = self.network_opt.minimize(self.loss)
 
     def add_baseline_op(self, scope="baseline"):
         self.baseline = tf.squeeze(
@@ -153,11 +160,12 @@ class PolicyGradient(object):
         self.add_summary()
         init = tf.global_variables_initializer()
 
+        self.sess.run(init)
+
         if config.recover_checkpoint_path:
             print("Recovering model...")
             self.recover_model_checkpoint(self.sess, self.saver,
                                           config.recover_checkpoint_path)
-        self.sess.run(init)
 
     def add_summary(self):
         self.avg_reward_placeholder = tf.placeholder(tf.float32, shape=(),
@@ -344,8 +352,13 @@ class PolicyGradient(object):
         num_tasks = 1
         if self.config.do_meta_learning:
             num_tasks = self.config.num_meta_learning_training_tasks
+
+        old = self.sess.run(tf.get_collection(
+            tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
+
         print 'self.config.do_meta_learning = %s' % self.config.do_meta_learning
         print 'num_tasks = %s' % num_tasks
+
 
         for taski in xrange(num_tasks):
             if self.config.do_meta_learning:
@@ -375,11 +388,17 @@ class PolicyGradient(object):
                 if self.config.use_baseline:
                     self.update_baseline(returns, observations)
 
+                old = self.sess.run(tf.get_collection(
+                    tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
+
                 self.sess.run(self.train_op, feed_dict={
                     self.observation_placeholder: observations,
                     self.action_placeholder: actions,
                     self.advantage_placeholder: advantages
                 })
+
+                old = self.sess.run(tf.get_collection(
+                    tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
 
                 if t % self.config.summary_freq == 0:
                     self.update_averages(total_rewards, scores_eval)
@@ -388,22 +407,26 @@ class PolicyGradient(object):
                 self.batch_counter += 1
 
                 avg_reward = np.mean(total_rewards)
-                sigma_reward = np.sqrt(np.var(total_rewards) / len(total_rewards))
+                sigma_reward = np.sqrt(
+                    np.var(total_rewards) / len(total_rewards))
                 msg = "Average reward: {:04.2f} +/- {:04.2f}".format(avg_reward,
                                                                      sigma_reward)
                 self.logger.info(msg)
 
                 last_record += 1
-                if self.config.record and (last_record > self.config.record_freq):
+                if self.config.record and (
+                        last_record > self.config.record_freq):
                     self.logger.info("Recording...")
                     last_record = 0
                     self.record()
 
                 # TODO: Message for Jiayu: This is the subpolicy viz code
-                if t == config.num_batches - 1 and config.visualize_sub_policies:
+
+                if t == config.num_batches - 1 and \
+                    config.visualize_sub_policies:
                     logits = self.sess.run(self.sub_policies, feed_dict={
-                        self.observation_placeholder: np.expand_dims(np.arange(81),
-                                                                     axis=1)
+                        self.observation_placeholder: np.expand_dims(
+                            np.arange(81), axis=1)
                     })
                     plt.clf()
                     fig, axes = plt.subplots(1, 2)
@@ -455,20 +478,21 @@ class PolicyGradient(object):
                         ax.xaxis.set_ticklabels([])
                         ax.yaxis.set_ticklabels([])
                     plt.tight_layout()
-                    # plt.savefig(str(np.random.randint(0, 10000)) + ' test.png')
+                    # plt.savefig(str(np.random.randint(0, 10000)) + '
+                    # test.png')
                     plt.savefig('plots/subpolicies_%s.png' % get_timestamp())
-                    
 
-                if t % config.record_freq == 0:
                     self.save_model_checkpoint(self.sess, self.saver,
-                                               os.path.join(self.config.output_path,
+                                               os.path.join(
+                                                   self.config.output_path,
 
-                                                            'model.ckpt'), t)
+                                                   'model.ckpt'), t)
 
         self.logger.info("- Training done.")
         export_plot(scores_eval, "Score", config.env_name,
                     self.config.plot_output)
-        export_plot(scores_eval, "Score", config.env_name, "plots/score_%s.png" % get_timestamp())
+        export_plot(scores_eval, "Score", config.env_name,
+                    "plots/score_%s.png" % get_timestamp())
 
         if str(config.env_name).startswith(
             "Fourrooms") and config.visualize_master_policy:
@@ -489,8 +513,8 @@ class PolicyGradient(object):
             plt.tight_layout()
             # plt.savefig('Rooms and Subs ' + str(np.random.randint(0, 10000)),
             #             dpi=300)
-            plt.savefig('plots/action_logits_per_room_%s.png' % get_timestamp(), dpi=300)
-            
+            plt.savefig('plots/action_logits_per_room_%s.png' % get_timestamp(),
+                        dpi=300)
 
     def get_room_by_state(self, state):
         room0 = [2, 10, 11, 12, 19, 20, 21, 28, 29, 30]

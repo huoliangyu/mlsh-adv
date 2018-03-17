@@ -28,27 +28,27 @@ class RecurrentMLSHV2(PolicyGradient):
 
         lstm_cell = rnn.BasicLSTMCell(num_units=config.num_sub_policies)
 
-        concatenated = tf.concat([self.sub_policies, self.state_embedding],
-                                 axis=2)
+        self.proposed_sub_policies = self.sub_policies
 
-        if config.freeze_sub_policy:
-            concatenated = tf.stop_gradient(concatenated, name='stop')
+        concatenated = tf.concat(
+            [self.proposed_sub_policies, self.state_embedding], axis=2)
 
-        self.out, states = tf.nn.dynamic_rnn(cell=lstm_cell,
-                                             inputs=concatenated,
-                                             dtype=tf.float32, scope='master')
+        self.out, _ = tf.nn.dynamic_rnn(cell=lstm_cell, inputs=concatenated,
+                                        dtype=tf.float32, scope='master')
         last_output = self.out[:, -1, :]
 
         self.chosen_index = tf.argmax(last_output, axis=1)
-
-        self.weights = tf.one_hot(indices=self.chosen_index,
-                                  depth=config.num_sub_policies)
+        max_output = tf.reduce_max(last_output, axis=1, keep_dims=True)
+        tmp = tf.nn.relu(last_output - max_output + 1e-17)
+        self.weights = tmp / tf.reduce_sum(tmp, axis=1, keep_dims=True)
 
         final_policy = tf.reduce_sum(
-            tf.expand_dims(self.weights, axis=2) * self.sub_policies, axis=1)
+            tf.expand_dims(self.weights, axis=2) * self.proposed_sub_policies,
+            axis=1)
 
         if config.sub_policy_index > -1:
-            final_policy = self.sub_policies[:, config.sub_policy_index, :]
+            final_policy = self.proposed_sub_policies[:,
+                           config.sub_policy_index, :]
 
         return final_policy
 
@@ -61,4 +61,3 @@ if __name__ == "__main__":
     config = config('RecurrentMLSH-v2')
     model = RecurrentMLSHV2(env, config)
     model.run()
-
