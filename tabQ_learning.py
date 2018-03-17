@@ -180,9 +180,13 @@ def main():
   # randomize_fourrooms_task(env)
   # Q = learn_Q_QLearning(env, num_episodes=20000, e=1.0, gamma=1.0, lr=0.3, decay_rate=0.92)
 
-  env = gym.make('Fourrooms-large-v0')
+  # env = gym.make('Fourrooms-large-v0')
+  # randomize_fourrooms_task(env)
+  # Q = learn_Q_QLearning(env, num_episodes=10000, e=1.0, gamma=1.0, lr=0.3, decay_rate=0.92)
+
+  env = gym.make('Stochastic-Fourrooms-medium-v0')
   randomize_fourrooms_task(env)
-  Q = learn_Q_QLearning(env, num_episodes=10000, e=1.0, gamma=1.0, lr=0.3, decay_rate=0.92)
+  Q = learn_Q_QLearning(env, num_episodes=20000, e=1.0, gamma=1.0, lr=0.3, decay_rate=0.92)
 
   print('Q =\n%s' % Q)
   # render_single_Q(env, Q)

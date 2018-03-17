@@ -189,9 +189,9 @@ if __name__ == "__main__":
   if not os.path.exists('./plots'):
     os.makedirs('./plots')
 
-  env = gym.make('Fourrooms-small-v0')
-  randomize_fourrooms_task(env)
-  V_pi, p_pi, niter_pi = policy_iteration(env.P, env.nS, env.nA, gamma=1.0, max_iteration=1000, tol=1e-3)
+  # env = gym.make('Fourrooms-small-v0')
+  # randomize_fourrooms_task(env)
+  # V_pi, p_pi, niter_pi = policy_iteration(env.P, env.nS, env.nA, gamma=1.0, max_iteration=1000, tol=1e-3)
 
   # env = gym.make('Fourrooms-medium-v0')
   # randomize_fourrooms_task(env)
@@ -200,6 +200,14 @@ if __name__ == "__main__":
   # env = gym.make('Fourrooms-large-v0')
   # randomize_fourrooms_task(env)
   # V_pi, p_pi, niter_pi = policy_iteration(env.P, env.nS, env.nA, gamma=1.0, max_iteration=1000, tol=1e-3)
+
+  # env = gym.make('Stochastic-Fourrooms-small-v0')
+  # randomize_fourrooms_task(env)
+  # V_pi, p_pi, niter_pi = policy_iteration(env.P, env.nS, env.nA, gamma=1.0, max_iteration=1000, tol=1e-3)
+
+  env = gym.make('Stochastic-Fourrooms-large-v0')
+  randomize_fourrooms_task(env)
+  V_pi, p_pi, niter_pi = policy_iteration(env.P, env.nS, env.nA, gamma=1.0, max_iteration=1000, tol=1e-3)
 
   print('Policy Iteration')
   # print 'V_pi =\n%s' % V_pi

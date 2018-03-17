@@ -99,12 +99,16 @@ class Fourrooms(discrete.DiscreteEnv):
         'video.frames_per_second': 50
     }
 
-    def __init__(self, desc=None, map_name='small'):
+    def __init__(self, desc=None, map_name='small', stochastic=False, action_success_prob=0.8, slip_away=False):
         if desc is None and map_name is None:
             raise ValueError('Must provide either desc or map_name')
         elif desc is None:
             desc = MAPS[map_name]
         self.desc = desc = np.asarray(desc, dtype='c')
+        self.stochastic = stochastic
+        self.action_success_prob = action_success_prob
+        self.slip_away = slip_away
+
         self.nrow, self.ncol = nrow, ncol = desc.shape
 
         self.nA = nA = 4
@@ -210,12 +214,28 @@ class Fourrooms(discrete.DiscreteEnv):
                     if s == self.goal:
                         li.append((1.0, s, 0, True))
                     else:
-                        # TODO(yejiayu): Add stochastic case.
                         newrow, newcol = self.inc(row, col, a)
                         newstate = self.to_s(newrow, newcol)
                         done = (newstate == self.goal)
                         rew = (newstate == self.goal) * self.nrow * self.ncol - 1
-                        li.append((1.0, newstate, rew, done))
+
+                        if self.stochastic:
+                            # stochastic four rooms
+                            li.append((self.action_success_prob, newstate, rew, done))
+                            if self.slip_away:
+                                for slip_a in range(self.nA):
+                                    if slip_a != a:
+                                        slip_newrow, slip_newcol = self.inc(row, col, slip_a)
+                                        slip_newstate = self.to_s(slip_newrow, slip_newcol)
+                                        slip_done = (slip_newstate == self.goal)
+                                        slip_rew = (slip_newstate == self.goal) * self.nrow * self.ncol - 1
+                                        li.append(((1.0 - self.action_success_prob) / (self.nA - 1.0), slip_newstate, slip_rew, slip_done))
+
+                            else:
+                                li.append((1 - self.action_success_prob, s, -1, s == self.goal))
+                        else:
+                            # deterministic four rooms
+                            li.append((1.0, newstate, rew, done))
 
 
         # print '-------------------'
@@ -231,10 +251,10 @@ class Fourrooms(discrete.DiscreteEnv):
             if self.do_not_randomly_reset:
                 self.s = self.start
                 self.lastaction=None
-                print '---------------------------------'
-                print 'setting start = %s' % self.start
-                print 'setting goal = %s' % self.goal
-                print '---------------------------------'
+                # print '---------------------------------'
+                # print 'setting start = %s' % self.start
+                # print 'setting goal = %s' % self.goal
+                # print '---------------------------------'
                 return self.s
 
             return super(Fourrooms, self).reset()
@@ -286,7 +306,8 @@ class Fourrooms(discrete.DiscreteEnv):
             return self.s
 
         elif 'start' in seed:
-            np.random.seed(seed['start'])
+            if 'set-seed' in seed:
+                np.random.seed(seed['start'])
 
             self.start = sample_from_ones(self.isd_all)
             while self.start == self.goal:
@@ -294,7 +315,7 @@ class Fourrooms(discrete.DiscreteEnv):
             self.lastaction=None
 
             print '---------------------------------'
-            print 'using seed = %s' % seed['start']
+            # print 'using seed = %s' % seed['start']
             print 'setting start = %s' % self.start
             print 'setting goal = %s' % self.goal
             print '---------------------------------'
@@ -303,7 +324,8 @@ class Fourrooms(discrete.DiscreteEnv):
             return self.s
 
         elif 'goal-on-edge' in seed:
-            np.random.seed(seed['goal-on-edge'])
+            if 'set-seed' in seed:
+                np.random.seed(seed['goal-on-edge'])
 
             self.start = sample_from_ones(self.isd, self)
             self.lastaction=None
@@ -314,7 +336,7 @@ class Fourrooms(discrete.DiscreteEnv):
             self.P = self.generate_transitions()
 
             print '---------------------------------'
-            print 'using seed = %s' % seed['goal-on-edge']
+            # print 'using seed = %s' % seed['goal-on-edge']
             print 'setting start = %s' % self.start
             print 'setting goal = %s' % self.goal
             print '---------------------------------'
@@ -323,7 +345,8 @@ class Fourrooms(discrete.DiscreteEnv):
             return self.s
 
         elif 'goal-on-all' in seed:
-            np.random.seed(seed['goal-on-all'])
+            if 'set-seed' in seed:
+                np.random.seed(seed['goal-on-all'])
 
             self.start = sample_from_ones(self.isd)
             self.lastaction=None
@@ -333,7 +356,7 @@ class Fourrooms(discrete.DiscreteEnv):
             self.P = self.generate_transitions()
 
             print '---------------------------------'
-            print 'using seed = %s' % seed['goal-on-all']
+            # print 'using seed = %s' % seed['goal-on-all']
             print 'setting start = %s' % self.start
             print 'setting goal = %s' % self.goal
             print '---------------------------------'
@@ -342,7 +365,8 @@ class Fourrooms(discrete.DiscreteEnv):
             return self.s
 
         elif 'start+goal-on-edge' in seed:
-            np.random.seed(seed['start+goal-on-edge'])
+            if 'set-seed' in seed:
+                np.random.seed(seed['start+goal-on-edge'])
 
             self.start = sample_from_ones(self.isd_all)
             self.lastaction=None
@@ -353,7 +377,7 @@ class Fourrooms(discrete.DiscreteEnv):
             self.P = self.generate_transitions()
 
             print '---------------------------------'
-            print 'using seed = %s' % seed['start+goal-on-edge']
+            # print 'using seed = %s' % seed['start+goal-on-edge']
             print 'setting start = %s' % self.start
             print 'setting goal = %s' % self.goal
             print '---------------------------------'
@@ -362,7 +386,8 @@ class Fourrooms(discrete.DiscreteEnv):
             return self.s
 
         elif 'start+goal-on-all' in seed:
-            np.random.seed(seed['start+goal-on-all'])
+            if 'set-seed' in seed:
+                np.random.seed(seed['start+goal-on-all'])
 
             self.start = sample_from_ones(self.isd_all)
             self.lastaction=None
@@ -372,7 +397,7 @@ class Fourrooms(discrete.DiscreteEnv):
             self.P = self.generate_transitions()
 
             print '---------------------------------'
-            print 'using seed = %s' % seed['start+goal-on-all']
+            # print 'using seed = %s' % seed['start+goal-on-all']
             print 'setting start = %s' % self.start
             print 'setting goal = %s' % self.goal
             print '---------------------------------'
