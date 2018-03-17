@@ -14,7 +14,7 @@ class MlpPolicy(object):
             self._init(*args, **kwargs)
             self.scope = tf.get_variable_scope().name
 
-    def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
+    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, config,
               gaussian_fixed_var=True):
         assert isinstance(ob_space, gym.spaces.Box)
 

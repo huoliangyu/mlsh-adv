@@ -11,12 +11,25 @@ from config import config
 class LSTMFCPolicy(object):
     recurrent = True
 
+    def single_cell(self, num_units, cell_type, name):
+        if cell_type == 'RNN':
+            rnn_cell = rnn.BasicRNNCell(num_units=num_units, name=name)
+            return rnn_cell
+        elif cell_type == 'LSTM':
+            lstm_cell = rnn.BasicLSTMCell(num_units=num_units, name=name)
+            return lstm_cell
+        elif cell_type == 'GRU':
+            gru_cell = rnn.GRUCell(num_units=num_units, name=name)
+            return gru_cell
+        else:
+            raise Exception()
+
     def __init__(self, name, *args, **kwargs):
         with tf.variable_scope(name):
             self._init(*args, **kwargs)
             self.scope = tf.get_variable_scope().name
 
-    def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
+    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, config,
               gaussian_fixed_var=True):
         assert isinstance(ob_space, gym.spaces.Box)
 
@@ -47,9 +60,14 @@ class LSTMFCPolicy(object):
 
             def sub_pol(input_m, scope):
                 state_embedding = tf.tile(tf.expand_dims(input_m, axis=1),
-                                          [1, 4, 1])
-                rnn_cell = rnn.BasicRNNCell(num_units=pdtype.param_shape()[0])
-                last_out, states = tf.nn.dynamic_rnn(cell=rnn_cell,
+                                          [1, config.num_sub_policies, 1])
+                rnn_cells = [self.single_cell(pdtype.param_shape()[0] // 2,
+                                              config.sub_policy_network, 'sub')
+                             for i in range(config.num_sub_policy_layers)]
+
+                subpolicy_multi_cell = rnn.MultiRNNCell(rnn_cells)
+
+                last_out, states = tf.nn.dynamic_rnn(cell=subpolicy_multi_cell,
                                                      inputs=state_embedding,
                                                      dtype=tf.float32,
                                                      scope=scope)

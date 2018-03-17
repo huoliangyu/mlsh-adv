@@ -1,4 +1,3 @@
-import numpy as np
 import tensorflow as tf
 
 
@@ -9,12 +8,17 @@ class config():
             raise Exception()
         self.algorithm = algorithm
 
-        output_path = "results/%s-bs=%s-algo=%s-usebaseline=%s-lr=%s" \
-                      "-baselinelayers=%sx%s-num_sub=%s-maxeps=%s-min" \
-                      "eps=%s-sub_index=%s-freezesub=%s-uniquestr" \
+        if str(algorithm).startswith('RecurrentMLSH'):
+            self.recurrent = True
+        else:
+            self.recurrent = False
+
+        output_path = "results/%s-bs=%s-algo=%s-usebl=%s-lr=%s" \
+                      "-bllayers=%sx%s-num_sub=%s-maxeps=%s-min" \
+                      "eps=%s-sub_index=%s-freezesub=%s-key" \
                       "=%s-numsublayers=%s-nummasterlayers=%s-max_num_sub" \
-                      "=%s-weighted_avg=%s-sub_net=%s" \
-                      "-master_net=%s" \
+                      "=%s-wa=%s-sub=%s-r=%s-master=%s-num_hid_l=%s-hid_size" \
+                      "=%s" \
                       "/" % (self.env_name, self.batch_size, self.algorithm,
                              self.use_baseline, self.learning_rate,
                              self.n_layers, self.baseline_layer_size,
@@ -23,7 +27,9 @@ class config():
                              self.freeze_sub_policy, self.unique_key,
                              self.num_sub_policy_layers, self.num_master_layers,
                              self.max_num_sub_policies, self.weight_average,
-                             self.sub_policy_network, self.master_network)
+                             self.sub_policy_network, self.recurrent,
+                             self.master_network, self.num_hid_layers,
+                             self.hid_size)
 
         self.model_output = output_path + "model.weights/"
         self.log_path = output_path + "log.txt"
@@ -33,6 +39,7 @@ class config():
 
     # env_name = "CartPole-v0"
     env_name = 'BipedalWalker-v2'
+
     # env_name = "InvertedPendulum-v1"
     # env_name = "Fourrooms-v1"
     # env_name = "HalfCheetah-v1"
@@ -50,13 +57,13 @@ class config():
     }
 
     lr_by_env = {
-        "CartPole-v0": 3e-2, "Fourrooms-v1": 3e-2, "HalfCheetah-v1": 3e-2,
-        "Ant-v1": 3e-2, "Ant-v2": 3e-2, "BipedalWalker-v2": 3e-2
+        "CartPole-v0": 3e-2, "Fourrooms-v1": 3e-2, "HalfCheetah-v1": 3e-1,
+        "Ant-v1": 3e-2, "Ant-v2": 3e-2, "BipedalWalker-v2": 3e-3
     }
 
     gamma_by_env = {
         "CartPole-v0": 1.0, "Fourrooms-v1": 1.0, "HalfCheetah-v1": 0.9,
-        "Ant-v1": 0.8, "Ant-v2": 0.8, "BipedalWalker-v2": 1.0
+        "Ant-v1": 0.8, "Ant-v2": 0.8, "BipedalWalker-v2": 0.99
     }
 
     num_batches_by_env = {
@@ -68,17 +75,24 @@ class config():
     visualize_master_policy = True
     visualize_sub_policies = True
 
+    num_hid_layers = 2
+    hid_size = 64
+
     recover_checkpoint_path = None
     # recover_checkpoint_path = \
-    #     "results/Fourrooms-v1-bs=1000-algo=RecurrentMLSH-v2-usebaseline=True" \
-    #                           "-lr=0.03-baselinelayers=4x32-num_sub=2-maxeps" \
+    #     "results/Fourrooms-v1-bs=1000-algo=RecurrentMLSH-v2-usebaseline
+    # =True" \
+    #
+    # "-lr=0.03-baselinelayers=4x32-num_sub=2-maxeps" \
     #     "=0.0-mineps=0.0" \
-    #                           "-sub_index=-1-freezesub=False-uniquestr=j-numsublayers=4" \
-    #                           "-nummasterlayers=4-max_num_sub=4-weighted_avg" \
+    #
+    # "-sub_index=-1-freezesub=False-uniquestr=j-numsublayers=4" \
+    #
+    # "-nummasterlayers=4-max_num_sub=4-weighted_avg" \
     #     "=False-sub_net=LSTM" \
     #                           "-master_net=LSTM/model.ckpt-100"
     record = False
-    unique_key = "d"
+    unique_key = "*"
     render = False
     max_epsilon = 0.0
     min_epsilon = 0.0
@@ -93,13 +107,13 @@ class config():
     normalize_advantage = True
     n_layers = 4
     baseline_layer_size = 32
-    max_num_sub_policies = 4
-    num_sub_policies = 2
+    max_num_sub_policies = 8
+    num_sub_policies = 4
 
     sub_policy_network = 'LSTM'
     master_network = 'LSTM'
-    num_sub_policy_layers = 1
-    num_master_layers = 1
+    num_sub_policy_layers = 8
+    num_master_layers = 8
 
     weight_average = False
     activation = tf.nn.relu

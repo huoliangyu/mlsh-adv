@@ -9,7 +9,7 @@ from config import config
 
 
 class RecurrentMLSHV7(object):
-    recurrent = False
+    recurrent = True
 
     def __init__(self, name, *args, **kwargs):
         print('initializing')
@@ -27,12 +27,13 @@ class RecurrentMLSHV7(object):
     def single_cell(self, num_units, cell_type, name):
         if cell_type == 'RNN':
             rnn_cell = rnn.BasicRNNCell(num_units=num_units, name=name)
-            # rnn_cell.zero_state(1, tf.float32)
             return rnn_cell
         elif cell_type == 'LSTM':
             lstm_cell = rnn.BasicLSTMCell(num_units=num_units, name=name)
-            # lstm_cell.zero_state(1, tf.float32)
             return lstm_cell
+        elif cell_type == 'GRU':
+            gru_cell = rnn.GRUCell(num_units=num_units, name=name)
+            return gru_cell
         else:
             raise Exception()
 
@@ -61,10 +62,13 @@ class RecurrentMLSHV7(object):
         alive = tf.constant(1, shape=[batch_size])
         condition = stop
 
-        raw_shape = list(cell.state_size)
-        for i in range(len(raw_shape)):
-            raw_shape[i] = rnn.LSTMStateTuple(hidden[i][0].get_shape(),
-                                              hidden[i][1].get_shape())
+        if config.sub_policy_network == 'LSTM':
+            raw_shape = list(cell.state_size)
+            for i in range(len(raw_shape)):
+                raw_shape[i] = rnn.LSTMStateTuple(hidden[i][0].get_shape(),
+                                                  hidden[i][1].get_shape())
+        elif config.sub_policy_network == 'GRU':
+            raw_shape = tuple([hid.get_shape() for hid in hidden])
 
         return tf.while_loop(condition, rnn_forward,
                              loop_vars=[out, hidden, alive, count_length],
@@ -78,15 +82,6 @@ class RecurrentMLSHV7(object):
                        n_layers=config.n_layers, output_activation=None,
                        batch_size=config.batch_size):
 
-        # if self.name == 'oldpi':
-        #     batch_size = 1
-
-        print(self.name, batch_size)
-
-        num_sub_policies = config.max_num_sub_policies
-        self.num_sub_policies = num_sub_policies
-
-        self.state_embedding = input
         self.num_actions_plus_1 = self.action_dim + 1
 
         subpolicy_multi_cell = rnn.MultiRNNCell([self.single_cell(
@@ -96,12 +91,11 @@ class RecurrentMLSHV7(object):
                                                 state_is_tuple=True)
 
         self.sub_policies, states, alive, length = self.dynamic_rnn(
-            subpolicy_multi_cell, inputs=self.state_embedding,
-            batch_size=batch_size)
+            subpolicy_multi_cell, inputs=input, batch_size=batch_size)
 
         self.sub_policies = self.sub_policies[:, :, :self.action_dim]
         # self.sub_policies => (batch size, max_length, action_dim)
-        # length.shape = (batch size)
+        # length => (batch size)
 
         master_multi_cell = rnn.MultiRNNCell([self.single_cell(
             num_units=config.max_num_sub_policies,
@@ -111,9 +105,9 @@ class RecurrentMLSHV7(object):
 
         max_length = tf.reduce_max(length)
 
-        concatenated = tf.concat([self.sub_policies, tf.tile(
-            tf.expand_dims(self.state_embedding, axis=1), [1, max_length, 1])],
-                                 axis=2)
+        concatenated = tf.concat([self.sub_policies,
+                                  tf.tile(tf.expand_dims(input, axis=1),
+                                      [1, max_length, 1])], axis=2)
 
         # concatenated => (batch size, max_length, action_dim + state_space)
 
@@ -150,7 +144,7 @@ class RecurrentMLSHV7(object):
             logit_ranges >= tf.expand_dims(length - 1, axis=1))
         # negative_logit_mask, logit mask => (batch size, max_num_sub)
 
-        mins = tf.reduce_min(candidate_logits, axis=1, keep_dims=True)
+        mins = tf.reduce_min(candidate_logits, axis=1, keepdims=True)
         # mins => (batch size, 1)
 
         reset_logits = candidate_logits * tf.cast(logit_mask, tf.float32)
@@ -161,15 +155,17 @@ class RecurrentMLSHV7(object):
 
         logits = reset_logits + offset
 
+        self.chosen_index = tf.cast(tf.argmax(logits, axis=1), tf.int32)
+
         if config.weight_average:
-            self.weights = tf.nn.softmax(logits=self.last_output, dim=1)
+            self.weights = tf.nn.softmax(logits=logits, axis=1)
         else:
-            self.chosen_index = tf.cast(tf.argmax(logits, axis=1), tf.int32)
             tf.Assert(tf.reduce_sum(
                 tf.cast(self.chosen_index < length, tf.int32)) == batch_size,
                       [self.chosen_index, length])
-            self.weights = tf.one_hot(indices=self.chosen_index,
-                                      depth=max_length)
+            max_output = tf.reduce_max(logits, axis=1, keepdims=True)
+            tmp = tf.nn.relu(logits - max_output + 1e-17)
+            self.weights = tmp / tf.reduce_sum(tmp, axis=1, keepdims=True)
 
         final_policy = tf.reduce_sum(
             tf.expand_dims(self.weights[:, :max_length],
@@ -177,10 +173,13 @@ class RecurrentMLSHV7(object):
 
         if config.sub_policy_index > -1:
             final_policy = self.sub_policies[:, config.sub_policy_index, :]
+
         print('finish building network!')
+        print('hidden layer size', self.num_actions_plus_1)
+
         return final_policy
 
-    def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
+    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, config,
               gaussian_fixed_var=True):
         assert isinstance(ob_space, gym.spaces.Box)
 
@@ -209,7 +208,7 @@ class RecurrentMLSHV7(object):
 
         with tf.variable_scope('pol'):
             if gaussian_fixed_var and isinstance(ac_space, gym.spaces.Box):
-                mean = self.policy_network(obz, 'RecurrentMLSHV6',
+                mean = self.policy_network(obz, config.algorithm,
                                            batch_size=self.batch_size)
 
                 logstd = tf.get_variable(name="logstd", shape=[1,
@@ -218,7 +217,7 @@ class RecurrentMLSHV7(object):
                                          initializer=tf.zeros_initializer())
                 pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
             else:
-                pdparam = self.policy_network(obz, 'RecurrentMLSHV6',
+                pdparam = self.policy_network(obz, config.algorithm,
                                               batch_size=self.batch_size)
 
         self.pd = pdtype.pdfromflat(pdparam)
