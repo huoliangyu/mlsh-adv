@@ -30,7 +30,7 @@ class config():
         self.record_path = output_path
         self.output_path = output_path
 
-        plot_output_dir = "./plots"
+        self.plot_output_dir = "./plots"
 
     #=================== HRL ===================
     do_meta_learning = False
@@ -48,6 +48,10 @@ class config():
     master_network = 'LSTM'
     num_sub_policy_layers = 1
     num_master_layers = 1
+
+    master_timescale = 3
+
+    # warmup =
     #=====================================================
 
     #=================== Meta-Learning ===================
@@ -106,19 +110,21 @@ class config():
 
     num_batches_by_env = {
         "CartPole-v0": 100,
-        "Fourrooms-small-v0": 1000,
-        "Fourrooms-medium-v0": 1000,
-        "Fourrooms-large-v0": 5,
+        "Fourrooms-small-v0": 100,
+        "Fourrooms-medium-v0": 100,
+        "Fourrooms-large-v0": 100,
         "HalfCheetah-v1": 1000,
         "Ant-v1": 1000,
         "Ant-v2": 1000,
         "BipedalWalker-v2": 1000
     }
 
+    warmup = 50
 
-    # recover_checkpoint_path = None
-    recover_checkpoint_path = "results/Fourrooms-large-v0-bs=1000-algo" \
-                              "=RecurrentMLSH-v2-usebaseline=True-lr=0.03-baselinelayers=4x32-num_sub=2-maxeps=0.0-mineps=0.0-sub_index=-1-freezesub=False-uniquestr=d-numsublayers=1-nummasterlayers=1-max_num_sub=4-wa=False-sub_net=LSTM-master_net=LSTM/model.ckpt-4"
+
+    recover_checkpoint_path = None
+    # recover_checkpoint_path = "results/Fourrooms-large-v0-bs=1000-algo" \
+                              # "=RecurrentMLSH-v2-usebaseline=True-lr=0.03-baselinelayers=4x32-num_sub=2-maxeps=0.0-mineps=0.0-sub_index=-1-freezesub=False-uniquestr=d-numsublayers=1-nummasterlayers=1-max_num_sub=4-wa=False-sub_net=LSTM-master_net=LSTM/model.ckpt-4"
 
     record = False
     unique_key = "d"

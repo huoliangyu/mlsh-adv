@@ -90,6 +90,8 @@ class PolicyGradient(object):
 
         self.lr = self.config.learning_rate
 
+        self.last_chosen_index = tf.constant(0)
+
         self.build()
 
     def add_placeholders_op(self):
@@ -396,10 +398,10 @@ class PolicyGradient(object):
                 self.sess.run(self.train_op, feed_dict={
                     self.observation_placeholder: observations,
                     self.action_placeholder: actions,
-                    self.advantage_placeholder: advantages
+                    self.advantage_placeholder: advantages,
+                    self.master_advantage_placeholder: master_advantages,
                 })
 
-                # old = self.sess.run(tf.get_collection(
                 #     tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
 
                 if t % self.config.summary_freq == 0:
