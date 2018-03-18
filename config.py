@@ -38,10 +38,10 @@ class config():
         self.output_path = output_path
 
     # env_name = "CartPole-v0"
-    env_name = 'BipedalWalker-v2'
+    # env_name = 'BipedalWalker-v2'
 
     # env_name = "InvertedPendulum-v1"
-    # env_name = "Fourrooms-v1"
+    env_name = "Fourrooms-v1"
     # env_name = "HalfCheetah-v1"
     # env_name = "Ant-v1"
     # env_name = "Ant-v2"
