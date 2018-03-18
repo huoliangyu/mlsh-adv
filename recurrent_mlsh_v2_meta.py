@@ -239,17 +239,17 @@ class RecurrentMLSHV2META(PolicyGradient):
             if num_episodes and episode >= num_episodes:
                 break
 
-        if str(config.env_name).startswith("Fourrooms"):
-            counter_by_room = {}
-            for room in rooms_and_sub_policies:
-                counter = Counter(rooms_and_sub_policies[room])
-                s = sum([counter[sub] for sub in counter])
-                for sub in range(config.num_sub_policies):
-                    counter[sub] = counter[sub] * 1.0 / s if sub in counter \
-                        else \
-                        0.0
-                    self.plot[room][sub].append(counter[sub])
-                counter_by_room[room] = counter
+        # if str(config.env_name).startswith("Fourrooms"):
+        #     counter_by_room = {}
+        #     for room in rooms_and_sub_policies:
+        #         counter = Counter(rooms_and_sub_policies[room])
+        #         s = sum([counter[sub] for sub in counter])
+        #         for sub in range(config.num_sub_policies):
+        #             counter[sub] = counter[sub] * 1.0 / s if sub in counter \
+        #                 else \
+        #                 0.0
+        #             self.plot[room][sub].append(counter[sub])
+        #         counter_by_room[room] = counter
             # print(counter_by_room)
 
         return paths, episode_rewards

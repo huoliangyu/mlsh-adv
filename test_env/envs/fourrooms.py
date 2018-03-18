@@ -269,10 +269,10 @@ class Fourrooms(discrete.DiscreteEnv):
                 self.start = sample_from_ones(self.isd_all)
             self.lastaction=None
 
-            print '---------------------------------'
-            print 'setting start = %s' % self.start
-            print 'setting goal = %s' % self.goal
-            print '---------------------------------'
+            # print '---------------------------------'
+            # print 'setting start = %s' % self.start
+            # print 'setting goal = %s' % self.goal
+            # print '---------------------------------'
             self.s = self.start
             self.do_not_randomly_reset = True
             return self.s
@@ -282,10 +282,10 @@ class Fourrooms(discrete.DiscreteEnv):
             self.start = seed['fixedstart']
             self.lastaction=None
 
-            print '---------------------------------'
-            print 'setting start = %s' % self.start
-            print 'setting goal = %s' % self.goal
-            print '---------------------------------'
+            # print '---------------------------------'
+            # print 'setting start = %s' % self.start
+            # print 'setting goal = %s' % self.goal
+            # print '---------------------------------'
             self.s = self.start
             self.do_not_randomly_reset = True
             return self.s
@@ -297,10 +297,10 @@ class Fourrooms(discrete.DiscreteEnv):
             self.P = self.generate_transitions()
             self.lastaction=None
 
-            print '---------------------------------'
-            print 'setting start = %s' % self.start
-            print 'setting goal = %s' % self.goal
-            print '---------------------------------'
+            # print '---------------------------------'
+            # print 'setting start = %s' % self.start
+            # print 'setting goal = %s' % self.goal
+            # print '---------------------------------'
             self.s = self.start
             self.do_not_randomly_reset = True
             return self.s
@@ -314,11 +314,11 @@ class Fourrooms(discrete.DiscreteEnv):
                 self.start = sample_from_ones(self.isd_all)
             self.lastaction=None
 
-            print '---------------------------------'
-            # print 'using seed = %s' % seed['start']
-            print 'setting start = %s' % self.start
-            print 'setting goal = %s' % self.goal
-            print '---------------------------------'
+            # print '---------------------------------'
+            # # print 'using seed = %s' % seed['start']
+            # print 'setting start = %s' % self.start
+            # print 'setting goal = %s' % self.goal
+            # print '---------------------------------'
             self.s = self.start
             self.do_not_randomly_reset = True
             return self.s
@@ -335,11 +335,11 @@ class Fourrooms(discrete.DiscreteEnv):
             #     self.goal = sample_from_ones(self.gsd_edge)
             self.P = self.generate_transitions()
 
-            print '---------------------------------'
-            # print 'using seed = %s' % seed['goal-on-edge']
-            print 'setting start = %s' % self.start
-            print 'setting goal = %s' % self.goal
-            print '---------------------------------'
+            # print '---------------------------------'
+            # # print 'using seed = %s' % seed['goal-on-edge']
+            # print 'setting start = %s' % self.start
+            # print 'setting goal = %s' % self.goal
+            # print '---------------------------------'
             self.s = self.start
             self.do_not_randomly_reset = True
             return self.s
@@ -355,11 +355,11 @@ class Fourrooms(discrete.DiscreteEnv):
                 self.goal = sample_from_ones(self.gsd_edge)
             self.P = self.generate_transitions()
 
-            print '---------------------------------'
-            # print 'using seed = %s' % seed['goal-on-all']
-            print 'setting start = %s' % self.start
-            print 'setting goal = %s' % self.goal
-            print '---------------------------------'
+            # print '---------------------------------'
+            # # print 'using seed = %s' % seed['goal-on-all']
+            # print 'setting start = %s' % self.start
+            # print 'setting goal = %s' % self.goal
+            # print '---------------------------------'
             self.s = self.start
             self.do_not_randomly_reset = True
             return self.s
@@ -376,11 +376,11 @@ class Fourrooms(discrete.DiscreteEnv):
             #     self.goal = sample_from_ones(self.gsd_edge)
             self.P = self.generate_transitions()
 
-            print '---------------------------------'
-            # print 'using seed = %s' % seed['start+goal-on-edge']
-            print 'setting start = %s' % self.start
-            print 'setting goal = %s' % self.goal
-            print '---------------------------------'
+            # print '---------------------------------'
+            # # print 'using seed = %s' % seed['start+goal-on-edge']
+            # print 'setting start = %s' % self.start
+            # print 'setting goal = %s' % self.goal
+            # print '---------------------------------'
             self.s = self.start
             self.do_not_randomly_reset = True
             return self.s
@@ -396,11 +396,11 @@ class Fourrooms(discrete.DiscreteEnv):
                 self.goal = sample_from_ones(self.gsd_edge)
             self.P = self.generate_transitions()
 
-            print '---------------------------------'
-            # print 'using seed = %s' % seed['start+goal-on-all']
-            print 'setting start = %s' % self.start
-            print 'setting goal = %s' % self.goal
-            print '---------------------------------'
+            # print '---------------------------------'
+            # # print 'using seed = %s' % seed['start+goal-on-all']
+            # print 'setting start = %s' % self.start
+            # print 'setting goal = %s' % self.goal
+            # print '---------------------------------'
             self.s = self.start
             self.do_not_randomly_reset = True
             return self.s

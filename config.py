@@ -54,7 +54,7 @@ class config():
 
     #=================== Meta-Learning ===================
     do_meta_learning = True
-    num_meta_learning_training_tasks = 20
+    num_meta_learning_training_tasks = 6
 
     # TODO: delte this, four rooms could be randomized.
     def get_env_name(self):
