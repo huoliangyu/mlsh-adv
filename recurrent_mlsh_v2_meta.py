@@ -66,7 +66,7 @@ class RecurrentMLSHV2META(PolicyGradient):
         self.master_policy_action_logits = last_output = self.out[:, -1, :]
 
         # self.last_chosen_index = self.chosen_index = tf.argmax(last_output, axis=1)
-        self.master_chosen_sub_policy_index = tf.argmax(last_output, axis=1)
+        # self.master_chosen_sub_policy_index = tf.argmax(last_output, axis=1)
 
         # return self.chosen_index
 
@@ -88,19 +88,12 @@ class RecurrentMLSHV2META(PolicyGradient):
 
     def build_policy_network_op(self, scope="policy_network"):
         self.proposed_sub_policies = self.sub_policies_act(self.observation_placeholder)
-        # self.master_chosen_one_hot = tf.cond(
-        #     self.at_master_timescale_placeholder,
-        #     lambda: self.master_policy_act(self.proposed_sub_policies),
-        #     lambda: tf.identity(self.last_chosen_one_hot))
-        # self.master_chosen_sub_policy_index = self.master_policy_act(self.proposed_sub_policies)
-        self.master_chosen_one_hot = self.master_policy_act(self.proposed_sub_policies)
 
-        # self.sub_policy_weights = tf.one_hot(
-        #     indices=self.master_chosen_sub_policy_index,
-        #     depth=self.config.num_sub_policies)
-        # self.final_policy = tf.reduce_sum(
-        #     tf.expand_dims(self.sub_policy_weights, axis=2) * self.proposed_sub_policies,
-        #     axis=1)
+        # master_timescale_mask = tf.cast(self.at_master_timescale_placeholder, tf.float32)
+        # self.master_chosen_one_hot = master_timescale_mask * self.master_policy_act(self.proposed_sub_policies) + (1 - master_timescale_mask) * tf.identity(self.last_chosen_one_hot)
+        self.master_chosen_one_hot = self.master_policy_act(self.proposed_sub_policies)
+        self.master_chosen_sub_policy_index = tf.argmax(self.master_policy_action_logits, axis=1)
+
         self.final_policy = tf.reduce_sum(
             self.master_chosen_one_hot * self.proposed_sub_policies,
             axis=1)
@@ -118,6 +111,8 @@ class RecurrentMLSHV2META(PolicyGradient):
 
             self.master_logprob = -tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=self.master_chosen_sub_policy_index, logits=self.master_policy_action_logits)
+            # self.master_logprob = -master_timescale_mask * tf.nn.sparse_softmax_cross_entropy_with_logits(
+            #     labels=self.master_chosen_sub_policy_index, logits=self.master_policy_action_logits)
         else:
             action_means = self.final_policy
             log_std = tf.get_variable(
@@ -131,7 +126,21 @@ class RecurrentMLSHV2META(PolicyGradient):
 
     def add_loss_op(self):
         self.subpolicy_loss = -tf.reduce_mean(self.logprob * self.advantage_placeholder)
+
         self.master_loss = -tf.reduce_mean(self.master_logprob * self.master_advantage_placeholder)
+
+        # nonzeros = tf.not_equal(self.master_logprob, 0)
+        # master_timescaled_master_prob = tf.boolean_mask(self.master_logprob, nonzeros)
+
+        # master_logprob_splitted_to_timescales = tf.split(self.master_logprob, self.config.master_timescale)
+        # print 'self.master_logprob.shape = ',
+        # print self.master_logprob.shape
+        # print 'master_logprob_splitted_to_timescales.shape = ',
+        # print master_logprob_splitted_to_timescales.shape
+        # master_timescaled_master_prob = tf.stack(master_logprob_splitted_to_timescales, axis=0)[:, 0]
+        # master_timescaled_master_prob = tf.reduce_sum(tf.stack(self.master_logprob, axis=0), axis=1)
+
+        # self.master_loss = -tf.reduce_mean(master_timescaled_master_prob * self.master_advantage_placeholder)
 
     # extract adv at every N timestep
     def calculate_master_advantage(self, adv):
@@ -139,6 +148,8 @@ class RecurrentMLSHV2META(PolicyGradient):
         for i in xrange(len(adv)):
             if i % self.config.master_timescale == 0:
                 master_adv.append(adv[i])
+            else:
+                master_adv.append(0)
 
         return np.array(master_adv)
 
@@ -169,13 +180,17 @@ class RecurrentMLSHV2META(PolicyGradient):
             for step in range(self.config.max_ep_len):
                 states.append(state)
 
+                is_at_master_timescale = False
+                if step % self.config.master_timescale == 0:
+                    is_at_master_timescale = True
+
                 if str(config.env_name).startswith("Fourrooms"):
                     room = self.get_room_by_state(state)
                     rooms.append(room)
 
                     chosen_sub_policy, action = self.sess.run(
                         [self.master_chosen_sub_policy_index, self.sampled_action], feed_dict={
-                            self.at_master_timescale_placeholder: (step % self.config.master_timescale == 0),
+                            self.at_master_timescale_placeholder: is_at_master_timescale,
                             self.observation_placeholder: [[states[-1]]]
                         })
                     action = action[0]
@@ -285,34 +300,50 @@ class RecurrentMLSHV2META(PolicyGradient):
                 advantages = self.calculate_advantage(returns, observations)
                 master_advantages = self.calculate_master_advantage(advantages)
 
-                # ========================== debug ==========================
-                # logprob_debug = self.sess.run(self.logprob, feed_dict={
-                #     self.observation_placeholder: observations,
-                #     self.action_placeholder: actions,
-                #     self.advantage_placeholder: advantages
-                # })
+                # # ========================== debug ==========================
+                # # logprob_debug = self.sess.run(self.logprob, feed_dict={
+                # #     self.observation_placeholder: observations,
+                # #     self.action_placeholder: actions,
+                # #     self.advantage_placeholder: advantages
+                # # })
                 # master_logprob_debug = self.sess.run(self.master_logprob, feed_dict={
                 #     self.observation_placeholder: observations,
                 #     self.action_placeholder: actions,
                 #     self.advantage_placeholder: advantages
                 # })
-                # print '======================================='
-                # print 'logprob_debug ='
-                # print logprob_debug.shape
-                # print 'logprob_debug.shape ='
-                # print logprob_debug
+                # master_logprob_splitted_to_timescales = tf.split(self.master_logprob, self.config.master_timescale)
+                # master_timescaled_master_prob = tf.Variable(tf.stack(master_logprob_splitted_to_timescales, axis=0)[:, 0])
+                # master_timescaled_master_prob_val = self.sess.run(master_logprob_splitted_to_timescales, feed_dict={
+                #     self.observation_placeholder: observations,
+                #     self.action_placeholder: actions,
+                #     self.advantage_placeholder: advantages
+                # })
 
-                # print 'advantages ='
-                # print advantages
-                # print 'advantages.shape ='
-                # print advantages.shape
+                # # print '======================================='
+                # # print 'logprob_debug ='
+                # # print logprob_debug
+                # # print 'logprob_debug.shape ='
+                # # print logprob_debug
 
+                # # print 'advantages ='
+                # # print advantages
+                # # print 'advantages.shape ='
+                # # print advantages.shape
+
+                # print 'master_logprob_debug ='
+                # print master_logprob_debug
                 # print 'master_logprob_debug.shape ='
                 # print master_logprob_debug.shape
-                # print 'master_advantages.shape ='
-                # print master_advantages.shape
                 # print '======================================='
-                # =========================================================== 
+                # print 'master_timescaled_master_prob_val ='
+                # print master_timescaled_master_prob_val
+                # print 'master_timescaled_master_prob_val.shape ='
+                # print master_timescaled_master_prob_val.shape
+
+                # # print 'master_advantages.shape ='
+                # # print master_advantages.shape
+                # print '======================================='
+                # # =========================================================== 
 
                 if self.config.use_baseline:
                     self.update_baseline(returns, observations)
@@ -323,8 +354,8 @@ class RecurrentMLSHV2META(PolicyGradient):
                 self.sess.run(self.master_train_op, feed_dict={
                     self.observation_placeholder: observations,
                     self.action_placeholder: actions,
-                    # self.master_advantage_placeholder: master_advantages,
-                    self.master_advantage_placeholder: advantages,
+                    self.master_advantage_placeholder: master_advantages,
+                    # self.master_advantage_placeholder: advantages,
                 })
 
                 if t >= self.config.warmup:
