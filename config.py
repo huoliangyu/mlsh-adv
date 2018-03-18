@@ -92,7 +92,7 @@ class config():
     #     "=False-sub_net=LSTM" \
     #                           "-master_net=LSTM/model.ckpt-100"
     record = False
-    unique_key = "*"
+    unique_key = ""
     render = False
     max_epsilon = 0.0
     min_epsilon = 0.0
