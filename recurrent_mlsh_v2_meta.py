@@ -140,7 +140,7 @@ class RecurrentMLSHV2META(PolicyGradient):
             if i % self.config.master_timescale == 0:
                 master_adv.append(adv[i])
 
-        return master_adv
+        return np.array(master_adv)
 
     def add_optimizer_op(self):
         self.master_adam = tf.train.AdamOptimizer(learning_rate=self.lr)
@@ -285,29 +285,13 @@ class RecurrentMLSHV2META(PolicyGradient):
                 advantages = self.calculate_advantage(returns, observations)
                 master_advantages = self.calculate_master_advantage(advantages)
 
-                if self.config.use_baseline:
-                    self.update_baseline(returns, observations)
-
-                # old = self.sess.run(tf.get_collection(
-                #     tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
-
-                self.sess.run(self.master_train_op, feed_dict={
-                    self.observation_placeholder: observations,
-                    self.action_placeholder: actions,
-                    self.advantage_placeholder: advantages,
-                    self.master_advantage_placeholder: master_advantages,
-                })
-
-                if t >= warmup:
-                    self.sess.run(self.subpolicy_train_op, feed_dict={
-                        self.observation_placeholder: observations,
-                        self.action_placeholder: actions,
-                        self.advantage_placeholder: advantages,
-                        self.master_advantage_placeholder: master_advantages,
-                    })
-
                 # ========================== debug ==========================
                 # logprob_debug = self.sess.run(self.logprob, feed_dict={
+                #     self.observation_placeholder: observations,
+                #     self.action_placeholder: actions,
+                #     self.advantage_placeholder: advantages
+                # })
+                # master_logprob_debug = self.sess.run(self.master_logprob, feed_dict={
                 #     self.observation_placeholder: observations,
                 #     self.action_placeholder: actions,
                 #     self.advantage_placeholder: advantages
@@ -322,8 +306,33 @@ class RecurrentMLSHV2META(PolicyGradient):
                 # print advantages
                 # print 'advantages.shape ='
                 # print advantages.shape
+
+                # print 'master_logprob_debug.shape ='
+                # print master_logprob_debug.shape
+                # print 'master_advantages.shape ='
+                # print master_advantages.shape
                 # print '======================================='
                 # =========================================================== 
+
+                if self.config.use_baseline:
+                    self.update_baseline(returns, observations)
+
+                # old = self.sess.run(tf.get_collection(
+                #     tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
+
+                self.sess.run(self.master_train_op, feed_dict={
+                    self.observation_placeholder: observations,
+                    self.action_placeholder: actions,
+                    # self.master_advantage_placeholder: master_advantages,
+                    self.master_advantage_placeholder: advantages,
+                })
+
+                if t >= self.config.warmup:
+                    self.sess.run(self.subpolicy_train_op, feed_dict={
+                        self.observation_placeholder: observations,
+                        self.action_placeholder: actions,
+                        self.advantage_placeholder: advantages,
+                    })
 
                 # old = self.sess.run(tf.get_collection(
                 #     tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
@@ -424,7 +433,6 @@ class RecurrentMLSHV2META(PolicyGradient):
 
         if str(config.env_name).startswith(
             "Fourrooms") and config.visualize_master_policy:
-            import matplotlib.pyplot as plt
             plt.rcParams["figure.figsize"] = [12, 12]
             f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, sharex='col',
                                                        sharey='row')
