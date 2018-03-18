@@ -112,8 +112,8 @@ class config():
 
     sub_policy_network = 'LSTM'
     master_network = 'LSTM'
-    num_sub_policy_layers = 1
-    num_master_layers = 1
+    num_sub_policy_layers = 4
+    num_master_layers = 4
 
     weight_average = False
     activation = tf.nn.relu

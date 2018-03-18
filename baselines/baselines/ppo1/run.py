@@ -42,7 +42,7 @@ def train(env_id, num_timesteps, seed, config):
 
 
 def main():
-    c = config('RecurrentMLSHV10')
+    c = config('mlp_policy')
     logger.configure()
     logger.log(c.output_path)
     train(config.env_name, num_timesteps=3e6, seed=np.random.randint(0, 100000),

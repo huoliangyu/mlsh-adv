@@ -16,32 +16,34 @@ def walklevel(some_dir, level=1):
 
 
 root = os.path.expanduser('~/Desktop/openai')
-prefix = 'openai-2018-03-18'
-dirs = walklevel(root, level=2)
 best = []
-for root1, dir1, file1 in dirs:
-    for root2, dir2, file2 in dirs:
-        if os.path.basename(root2).startswith(prefix):
-            print(root2)
-            rewards = []
-            length = []
-            with open(os.path.join(root2, 'log.txt'), 'r') as f:
-                print(f.readlines()[1])
-            data = csv.reader(open(os.path.join(root2, 'progress.csv')))
-            try:
-                fields = data.next()
-                for row in data:
-                    items = zip(fields, row)
-                    item = {}
-                    for (name, value) in items:
-                        item[name] = value.strip()
-                    rewards.append(float(item['EpRewMean']))
-                    length.append(float(item['TimestepsSoFar']))
-                best.append(max(rewards))
-                print(max(length))
-                assert max(length) > 3000000
-            except:
-                pass
+prefixes = ['openai-2018-03-18-14-31']
+
+for prefix in prefixes:
+    dirs = walklevel(root, level=2)
+    for root1, dir1, file1 in dirs:
+        for root2, dir2, file2 in dirs:
+            if os.path.basename(root2).startswith(prefix):
+                print(root2)
+                rewards = []
+                length = []
+                with open(os.path.join(root2, 'log.txt'), 'r') as f:
+                    print(f.readlines()[1])
+                data = csv.reader(open(os.path.join(root2, 'progress.csv')))
+                try:
+                    fields = data.next()
+                    for row in data:
+                        items = zip(fields, row)
+                        item = {}
+                        for (name, value) in items:
+                            item[name] = value.strip()
+                        rewards.append(float(item['EpRewMean']))
+                        length.append(float(item['TimestepsSoFar']))
+                    best.append(max(rewards))
+                    print(max(length))
+                    assert max(length) > 3000000
+                except Exception as e:
+                    print(e)
 
 print(best)
 print(np.mean(best))
