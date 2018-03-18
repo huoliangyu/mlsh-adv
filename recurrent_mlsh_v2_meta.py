@@ -1,10 +1,26 @@
+import copy
+
 import matplotlib.pyplot as plt
 import tensorflow.contrib.rnn as rnn
 
 from pg import *
+from visualize import visualize_fourrooms_policy
 
 
 class RecurrentMLSHV2META(PolicyGradient):
+    def single_cell(self, num_units, cell_type, name):
+        if cell_type == 'RNN':
+            rnn_cell = rnn.BasicRNNCell(num_units=num_units, name=name)
+            return rnn_cell
+        elif cell_type == 'LSTM':
+            lstm_cell = rnn.BasicLSTMCell(num_units=num_units, name=name)
+            return lstm_cell
+        elif cell_type == 'GRU':
+            gru_cell = rnn.GRUCell(num_units=num_units, name=name)
+            return gru_cell
+        else:
+            raise Exception()
+
     def add_placeholders_op(self):
         self.at_master_timescale_placeholder = tf.placeholder(tf.bool, shape=(),
                                                               name='time_scale')
@@ -46,9 +62,11 @@ class RecurrentMLSHV2META(PolicyGradient):
                                            [1, config.num_sub_policies, 1])
             num_actions = self.env.action_space.shape[0]
 
-        rnn_cell = rnn.BasicRNNCell(num_units=num_actions)
+        subpolicy_multi_cell = rnn.MultiRNNCell(
+            [self.single_cell(num_actions, config.sub_policy_network, 'sub') for
+             i in range(config.num_sub_policy_layers)], state_is_tuple=True)
 
-        self.sub_policies, states = tf.nn.dynamic_rnn(cell=rnn_cell,
+        self.sub_policies, states = tf.nn.dynamic_rnn(cell=subpolicy_multi_cell,
                                                       inputs=self.state_embedding,
                                                       dtype=tf.float32,
                                                       scope='subpolicy')
@@ -71,24 +89,12 @@ class RecurrentMLSHV2META(PolicyGradient):
         #  axis=1)
         # self.master_chosen_sub_policy_index = tf.argmax(last_output, axis=1)
 
-        # return self.chosen_index
-
         max_output = tf.reduce_max(last_output, axis=1, keep_dims=True)
         tmp = tf.nn.relu(last_output - max_output + 1e-17)
         self.weights = tmp / tf.reduce_sum(tmp, axis=1, keep_dims=True)
         self.last_chosen_one_hot = chosen_one_hot = tf.expand_dims(self.weights,
                                                                    axis=2)
         return chosen_one_hot
-
-        # final_policy = tf.reduce_sum(
-        #     tf.expand_dims(self.weights, axis=2) * self.proposed_sub_policies,
-        #     axis=1)
-
-        # if config.sub_policy_index > -1:
-        #     final_policy = self.proposed_sub_policies[:,
-        #                    config.sub_policy_index, :]
-
-        # return final_policy
 
     def build_policy_network_op(self, scope="policy_network"):
         self.proposed_sub_policies = self.sub_policies_act(
@@ -279,21 +285,6 @@ class RecurrentMLSHV2META(PolicyGradient):
         print 'num_tasks = %s' % num_tasks
 
         for taski in xrange(num_tasks):
-            # if self.config.do_meta_learning:
-            #     self.index = np.random.randint(0, 2)
-            #     if self.index == 0:
-            #         env.reset(seed={
-            #             'fixedstart+goal:start': (env.nS - env.ncol - 1),
-            #             'fixedstart+goal:goal': 2
-            #         })
-            #     else:
-            #         env.reset(seed={
-            #             'fixedstart+goal:start': (1 + env.ncol),
-            #             'fixedstart+goal:goal': (env.nS - 3)
-            #         })
-            #
-            #     print 'task #%s: start %s, goal %s' % (
-            #         taski, self.env.start, self.env.goal)
 
             for t in range(self.config.num_batches):
                 # print(t, self.get_epsilon(t))
@@ -321,11 +312,6 @@ class RecurrentMLSHV2META(PolicyGradient):
                 if self.config.use_baseline:
                     self.update_baseline(returns, observations)
 
-                # old = self.sess.run(tf.get_collection(
-                #     tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
-
-                # indices = [self.index for i in observations]
-                # print(indices[0])
                 # self.sess.run(self.master_train_op, feed_dict={
                 #     self.at_master_timescale_placeholder: True,
                 #     self.observation_placeholder: observations,
@@ -343,9 +329,6 @@ class RecurrentMLSHV2META(PolicyGradient):
                     self.advantage_placeholder: advantages,
                     self.master_chosen_sub_policy_index: self.indices
                 })
-
-                # old = self.sess.run(tf.get_collection(
-                #     tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
 
                 if t % self.config.summary_freq == 0:
                     self.update_averages(total_rewards, scores_eval)
@@ -376,61 +359,26 @@ class RecurrentMLSHV2META(PolicyGradient):
                             np.arange(81), axis=1)
                     })
                     plt.clf()
-                    fig, axes = plt.subplots(1, 2)
 
-                    left = 0
-                    down = 1
-                    right = 2
-                    up = 3
-                    block = -1
-                    goal = -2
+                    actions = []
+                    envs = []
+                    self.env.reset(seed={
+                        'fixedstart+goal:start': (env.nS - env.ncol - 1),
+                        'fixedstart+goal:goal': 2
+                    })
+                    envs.append(copy.deepcopy(self.env))
+                    self.env.reset(seed={
+                        'fixedstart+goal:start': (1 + env.ncol),
+                        'fixedstart+goal:goal': (env.nS - 3)
+                    })
+                    envs.append(copy.deepcopy(self.env))
 
                     for sub in range(config.num_sub_policies):
-                        actions = np.argmax(logits[:, sub, :], axis=1)
-                        map = [left, down, right, up]
+                        actions.append(np.argmax(logits[:, sub, :], axis=1))
 
-                        grid_vector = [map[i] for i in actions]
+                    visualize_fourrooms_policy(envs, actions)
 
-                        room0 = [2, 10, 11, 12, 19, 20, 21, 28, 29, 30]
-                        room1 = [14, 15, 16, 22, 23, 24, 25, 32, 33, 34]
-                        room2 = [38, 46, 47, 48, 55, 56, 57, 64, 65, 66]
-                        room3 = [42, 50, 51, 52, 58, 59, 60, 61, 68, 69, 70]
-
-                        indices = room0 + room1 + room2 + room3
-
-                        for i in range(81):
-                            if i not in indices:
-                                grid_vector[i] = block
-
-                        if self.config.do_meta_learning:
-                            grid_vector[2] = goal
-                            grid_vector[env.nS - 3] = goal
-                        else:
-                            # grid_vector[2] = goal
-                            # grid_vector[78] = goal
-                            grid_vector[self.env.goal] = goal
-
-                        grid = np.array_split(grid_vector, 9)
-                        # create discrete colormaps
-                        cmap = colors.ListedColormap(
-                            ['green', 'black', 'red', 'blue', 'pink', 'cyan'])
-                        bounds = [-2, -1, 0, 1, 2, 3, 4]
-                        norm = colors.BoundaryNorm(bounds, cmap.N)
-
-                        ax = axes[sub % 2]
-                        ax.imshow(grid, cmap=cmap, norm=norm)
-                        ax.set_title('Sub Policy ' + str(sub))
-
-                        # draw gridlines
-                        ax.grid(which='major', axis='both', linestyle='-',
-                                color='k', linewidth=2)
-                        ax.set_xticks(np.arange(-.5, 9, 1))
-                        ax.set_yticks(np.arange(-.5, 9, 1))
-                        ax.xaxis.set_ticklabels([])
-                        ax.yaxis.set_ticklabels([])
                     plt.tight_layout()
-                    # plt.savefig(str(np.random.randint(0, 10000)) + '
-                    # test.png')
                     plt.savefig('plots/subpolicies_%s.png' % get_timestamp())
 
                     self.save_model_checkpoint(self.sess, self.saver,

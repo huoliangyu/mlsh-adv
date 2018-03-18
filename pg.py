@@ -1,4 +1,6 @@
+import datetime
 import os
+import time
 from collections import Counter
 
 import gym
@@ -11,6 +13,10 @@ from matplotlib import colors
 from config import config
 from test_env import *
 from utils.general import export_plot, get_logger
+
+
+def get_timestamp():
+    return datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d%H%M%S')
 
 
 class PolicyGradient(object):

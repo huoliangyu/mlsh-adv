@@ -33,7 +33,7 @@ class MlpPolicy(object):
             last_out = obz
             for i in range(num_hid_layers):
                 last_out = tf.nn.tanh(
-                    tf.layers.dense(last_out, hid_size, name="fc%i" % (i + 1),
+                    tf.layers.dense(last_out, 64, name="fc%i" % (i + 1),
                                     kernel_initializer=U.normc_initializer(
                                         1.0)))
             self.vpred = tf.layers.dense(last_out, 1, name='final',

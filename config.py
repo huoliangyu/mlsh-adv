@@ -38,37 +38,42 @@ class config():
         self.output_path = output_path
 
     # env_name = "CartPole-v0"
-    # env_name = 'BipedalWalker-v2'
+    env_name = 'BipedalWalker-v2'
 
     # env_name = "InvertedPendulum-v1"
-    env_name = "Fourrooms-v1"
+    # env_name = "Fourrooms-v1"
+    # env_name = "Fourrooms-small-v0"
+
     # env_name = "HalfCheetah-v1"
     # env_name = "Ant-v1"
     # env_name = "Ant-v2"
 
-    # TODO message: Jiayu, this is where you can choose to alternate envs or not
     def get_env_name(self):
         # return "Fourrooms-v" + str(np.random.randint(0, 2))
         return "Fourrooms-v0"
 
     batch_size_by_env = {
-        "CartPole-v0": 64, "Fourrooms-v1": 1000, "HalfCheetah-v1": 50000, \
-        "Ant-v1": 100000, "Ant-v2": 64, "BipedalWalker-v2": 256
+        "CartPole-v0": 64, "Fourrooms-small-v0": 1000, "Fourrooms-v1": 1000, \
+        "HalfCheetah-v1": 50000, "Ant-v1": 100000, "Ant-v2": 64,
+        "BipedalWalker-v2": 256
     }
 
     lr_by_env = {
-        "CartPole-v0": 3e-2, "Fourrooms-v1": 3e-2, "HalfCheetah-v1": 3e-1,
-        "Ant-v1": 3e-2, "Ant-v2": 3e-2, "BipedalWalker-v2": 3e-4
+        "CartPole-v0": 3e-2, "Fourrooms-small-v0": 3e-2, "Fourrooms-v1": 3e-2, \
+        "HalfCheetah-v1": 3e-1, "Ant-v1": 3e-2, "Ant-v2": 3e-2,
+        "BipedalWalker-v2": 3e-4
     }
 
     gamma_by_env = {
-        "CartPole-v0": 1.0, "Fourrooms-v1": 1.0, "HalfCheetah-v1": 0.9,
-        "Ant-v1": 0.8, "Ant-v2": 0.8, "BipedalWalker-v2": 0.99
+        "CartPole-v0": 1.0, "Fourrooms-small-v0": 1.0, "Fourrooms-v1": 1.0, \
+        "HalfCheetah-v1": 0.9, "Ant-v1": 0.8, "Ant-v2": 0.8,
+        "BipedalWalker-v2": 0.99
     }
 
     num_batches_by_env = {
-        "CartPole-v0": 100, "Fourrooms-v1": 10, "HalfCheetah-v1": 1000,
-        "Ant-v1": 1000, "Ant-v2": 1000, "BipedalWalker-v2": 1000
+        "CartPole-v0": 100, "Fourrooms-small-v0": 100, "Fourrooms-v1": 10, \
+        "HalfCheetah-v1": 1000, "Ant-v1": 1000, "Ant-v2": 1000,
+        "BipedalWalker-v2": 1000
     }
 
     # TODO message: Jiayu, this is where you toggle doing viz or not
@@ -77,7 +82,7 @@ class config():
 
     num_hid_layers = 2
     hid_size = 64
-    recurrent_hid_size = 8
+    recurrent_hid_size = 4
 
     recover_checkpoint_path = None
     # recover_checkpoint_path = \
@@ -93,6 +98,9 @@ class config():
     #     "=False-sub_net=LSTM" \
     #                           "-master_net=LSTM/model.ckpt-100"
     record = False
+    do_meta_learning = True
+    num_meta_learning_training_tasks = 25
+    master_timescale = 25
     unique_key = ""
     render = False
     max_epsilon = 0.0
@@ -109,12 +117,12 @@ class config():
     n_layers = 4
     baseline_layer_size = 32
     max_num_sub_policies = 2
-    num_sub_policies = 4
+    num_sub_policies = 2
 
     sub_policy_network = 'LSTM'
     master_network = 'LSTM'
-    num_sub_policy_layers = 4
-    num_master_layers = 4
+    num_sub_policy_layers = 1
+    num_master_layers = 1
 
     weight_average = False
     activation = tf.nn.relu
