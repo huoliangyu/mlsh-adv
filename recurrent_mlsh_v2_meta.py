@@ -2,6 +2,7 @@ import tensorflow.contrib.rnn as rnn
 
 from pg import *
 import matplotlib.pyplot as plt
+from visualize import visualize_fourrooms_policy
 
 class RecurrentMLSHV2META(PolicyGradient):
     def add_placeholders_op(self):
@@ -89,9 +90,10 @@ class RecurrentMLSHV2META(PolicyGradient):
     def build_policy_network_op(self, scope="policy_network"):
         self.proposed_sub_policies = self.sub_policies_act(self.observation_placeholder)
 
-        # master_timescale_mask = tf.cast(self.at_master_timescale_placeholder, tf.float32)
-        # self.master_chosen_one_hot = master_timescale_mask * self.master_policy_act(self.proposed_sub_policies) + (1 - master_timescale_mask) * tf.identity(self.last_chosen_one_hot)
-        self.master_chosen_one_hot = self.master_policy_act(self.proposed_sub_policies)
+        master_timescale_mask = tf.cast(self.at_master_timescale_placeholder, tf.float32)
+        self.master_chosen_one_hot = master_timescale_mask * self.master_policy_act(self.proposed_sub_policies) + (1 - master_timescale_mask) * tf.identity(self.last_chosen_one_hot)
+        # self.master_chosen_one_hot = self.master_policy_act(self.proposed_sub_policies)
+
         self.master_chosen_sub_policy_index = tf.argmax(self.master_policy_action_logits, axis=1)
 
         self.final_policy = tf.reduce_sum(
@@ -248,7 +250,7 @@ class RecurrentMLSHV2META(PolicyGradient):
                         0.0
                     self.plot[room][sub].append(counter[sub])
                 counter_by_room[room] = counter
-            print(counter_by_room)
+            # print(counter_by_room)
 
         return paths, episode_rewards
 
@@ -276,12 +278,16 @@ class RecurrentMLSHV2META(PolicyGradient):
 
         for taski in xrange(num_tasks):
             if self.config.do_meta_learning:
-                env_name = self.config.get_env_name()
-                self.env = gym.make(env_name)
-                print 'task #%s: %s' % (taski, env_name)
+                if np.random.randint(0, 2) == 0:
+                    env.reset(seed={'fixedstart+goal:start':(env.nS - env.ncol - 1), 'fixedstart+goal:goal':2})
+                else:
+                    env.reset(seed={'fixedstart+goal:start':(1 + env.ncol), 'fixedstart+goal:goal':(env.nS -3)})
+
+                print 'task #%s: start %s, goal %s' % (taski, self.env.start, self.env.goal)
 
             for t in range(self.config.num_batches):
-                print(t, self.get_epsilon(t))
+                # print(t, self.get_epsilon(t))
+                print 'train iter #%s:' % t
                 paths, total_rewards = self.sample_path(env=self.env)
 
                 scores_eval += total_rewards
@@ -352,6 +358,7 @@ class RecurrentMLSHV2META(PolicyGradient):
                 #     tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
 
                 self.sess.run(self.master_train_op, feed_dict={
+                    self.at_master_timescale_placeholder: True,
                     self.observation_placeholder: observations,
                     self.action_placeholder: actions,
                     self.master_advantage_placeholder: master_advantages,
@@ -360,6 +367,7 @@ class RecurrentMLSHV2META(PolicyGradient):
 
                 if t >= self.config.warmup:
                     self.sess.run(self.subpolicy_train_op, feed_dict={
+                        self.at_master_timescale_placeholder: True,
                         self.observation_placeholder: observations,
                         self.action_placeholder: actions,
                         self.advantage_placeholder: advantages,
@@ -423,9 +431,13 @@ class RecurrentMLSHV2META(PolicyGradient):
                             if i not in indices:
                                 grid_vector[i] = block
 
-                        grid_vector[2] = goal
-                        # grid_vector[78] = goal
-                        # grid_vector[self.env.goal] = goal
+                        if self.config.do_meta_learning:
+                            grid_vector[2] = goal
+                            grid_vector[env.nS - 3] = goal
+                        else:
+                            # grid_vector[2] = goal
+                            # grid_vector[78] = goal
+                            grid_vector[self.env.goal] = goal
 
                         grid = np.array_split(grid_vector, 9)
                         # create discrete colormaps
@@ -489,6 +501,8 @@ if __name__ == "__main__":
         os.makedirs('./plots')
 
     env = gym.make(config.env_name)
+    # env.reset(seed={'fixedstart+goal:start':(1 + env.ncol), 'fixedstart+goal:goal':(env.nS -3)})
+
     config = config('RecurrentMLSH-v2')
     model = RecurrentMLSHV2META(env, config)
     model.run()

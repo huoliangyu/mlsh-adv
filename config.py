@@ -33,8 +33,6 @@ class config():
         self.plot_output_dir = "./plots"
 
     #=================== HRL ===================
-    do_meta_learning = False
-    num_meta_learning_training_tasks = 20
     # TODO message: Jiayu, this is where you toggle doing viz or not
     visualize_master_policy = True
     visualize_sub_policies = True
@@ -55,7 +53,7 @@ class config():
     #=====================================================
 
     #=================== Meta-Learning ===================
-    do_meta_learning = False
+    do_meta_learning = True
     num_meta_learning_training_tasks = 20
 
     # TODO: delte this, four rooms could be randomized.
