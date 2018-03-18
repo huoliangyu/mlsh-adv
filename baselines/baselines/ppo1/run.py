@@ -15,6 +15,12 @@ def train(env_id, num_timesteps, seed, config):
     elif config.algorithm == 'RecurrentMLSHV8':
         from baselines.ppo1.lstm_fc_policy import LSTMFCPolicy as policy
         from baselines.ppo1 import pposgd_simple
+    elif config.algorithm == 'RecurrentMLSHV9':
+        from baselines.ppo1.recurrent_mlsh_v9 import RecurrentMLSHV9 as policy
+        from baselines.ppo1 import pposgd_simple_alt as pposgd_simple
+    elif config.algorithm == 'RecurrentMLSHV10':
+        from baselines.ppo1.recurrent_mlsh_v10 import RecurrentMLSHV10 as policy
+        from baselines.ppo1 import pposgd_simple_alt as pposgd_simple
     elif config.algorithm == 'mlp_policy':
         from mlp_policy import MlpPolicy as policy
         from baselines.ppo1 import pposgd_simple
@@ -36,7 +42,7 @@ def train(env_id, num_timesteps, seed, config):
 
 
 def main():
-    c = config('RecurrentMLSHV7')
+    c = config('RecurrentMLSHV10')
     logger.configure()
     logger.log(c.output_path)
     train(config.env_name, num_timesteps=3e6, seed=np.random.randint(0, 100000),
