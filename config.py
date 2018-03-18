@@ -40,7 +40,7 @@ class config():
     sub_policy_index = -1  # -1 means activates master policy
 
     max_num_sub_policies = 4
-    num_sub_policies = 2
+    num_sub_policies = 4
 
     sub_policy_network = 'LSTM'
     master_network = 'LSTM'
@@ -54,12 +54,8 @@ class config():
 
     #=================== Meta-Learning ===================
     do_meta_learning = True
-    num_meta_learning_training_tasks = 6
-
-    # TODO: delte this, four rooms could be randomized.
-    def get_env_name(self):
-        # return "Fourrooms-v" + str(np.random.randint(0, 2))
-        return "Fourrooms-small-v0"
+    num_meta_learning_distinct_tasks = 4
+    num_meta_learning_training_tasks = 16
     #=====================================================
 
     # env_name = "CartPole-v0"
@@ -76,7 +72,7 @@ class config():
     batch_size_by_env = {
         "CartPole-v0": 64,
         "Fourrooms-small-v0": 1000,
-        "Fourrooms-medium-v0": 1000,
+        "Fourrooms-medium-v0": 2000,
         "Fourrooms-large-v0": 1000,
         "HalfCheetah-v1": 50000,
         "Ant-v1": 100000,
@@ -109,8 +105,8 @@ class config():
     num_batches_by_env = {
         "CartPole-v0": 100,
         "Fourrooms-small-v0": 100,
-        "Fourrooms-medium-v0": 100,
-        "Fourrooms-large-v0": 100,
+        "Fourrooms-medium-v0": 200,
+        "Fourrooms-large-v0": 500,
         "HalfCheetah-v1": 1000,
         "Ant-v1": 1000,
         "Ant-v2": 1000,

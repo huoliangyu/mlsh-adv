@@ -115,8 +115,17 @@ def visualize_fourrooms_policy(env, policy):
 
 def visualize_fourrooms_multi_policy(envs, policies):
     fig, ax = plt.subplots(1, len(policies))
+    if len(policies) == 4:
+        fig, ax = plt.subplots(2, 2, sharex='col', sharey='row')
     for i in range(len(policies)):
         env = envs[i]
+
+        axi = None
+        if len(policies) == 4:
+          axi = ax[i/2][i%2]
+        else:
+          axi = ax[i]
+
         nrow, ncol = env.desc.shape
 
         # 0: left
@@ -131,6 +140,12 @@ def visualize_fourrooms_multi_policy(envs, policies):
         b = -1
         # goal
         g = -2
+
+        # print 'nrow = %s' % nrow
+        # print 'ncol = %s' % ncol
+        # print 'env.nS = %s' % env.nS
+        # print 'len(policies) = %s' % len(policies)
+        # print 'len(policies[0]) = %s' % len(policies[0])
 
         for s in xrange(env.nS):
             if env.desc[s / nrow][s % ncol] in b'X':
@@ -148,15 +163,15 @@ def visualize_fourrooms_multi_policy(envs, policies):
         bounds = [-2, -1, 0, 1, 2, 3, 4]
         norm = colors.BoundaryNorm(bounds, cmap.N)
 
-        ax[i].imshow(data, cmap=cmap, norm=norm)
+        axi.imshow(data, cmap=cmap, norm=norm)
 
         # draw gridlines
-        ax[i].grid(which='major', axis='both', linestyle='-', color='k',
+        axi.grid(which='major', axis='both', linestyle='-', color='k',
                    linewidth=2)
-        ax[i].set_xticks(np.arange(-.5, ncol, 1));
-        ax[i].set_yticks(np.arange(-.5, nrow, 1));
-        ax[i].xaxis.set_ticklabels([])
-        ax[i].yaxis.set_ticklabels([])
+        axi.set_xticks(np.arange(-.5, ncol, 1));
+        axi.set_yticks(np.arange(-.5, nrow, 1));
+        axi.xaxis.set_ticklabels([])
+        axi.yaxis.set_ticklabels([])
 
         # plt.text(-0.5, -0.5, 'u', fontsize=12)
         # plt.text(2.5, 2.5, 'd', fontsize=12)
@@ -178,16 +193,16 @@ def visualize_fourrooms_multi_policy(envs, policies):
                 if s == env.start:
                     # plt.text(c - arrow_offset, r + arrow_offset, u'\u9898',
                     # fontsize=12, color='white')
-                    ax[i].scatter(c - start_offset, r + start_offset, s=80,
+                    axi.scatter(c - start_offset, r + start_offset, s=80,
                                   facecolors='none', edgecolors='w')
 
                 if s == env.goal:
-                    ax[i].scatter(c - start_offset, r + start_offset, s=80,
+                    axi.scatter(c - start_offset, r + start_offset, s=80,
                                   marker=(5, 1), facecolors='none',
                                   edgecolors='w')
 
                 if env.desc[r][c] not in b'XGH' and s != env.goal:
-                    ax[i].text(c - arrow_offset, r + arrow_offset,
+                    axi.text(c - arrow_offset, r + arrow_offset,
                                direction[data[r][c]], fontsize=12,
                                color='white')
 

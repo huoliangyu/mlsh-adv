@@ -22,6 +22,8 @@ class RecurrentMLSHV2META(PolicyGradient):
             raise Exception()
 
     def add_placeholders_op(self):
+        self.skip_master_policy_placeholder = tf.placeholder(tf.bool, shape=(),
+                                                              name='skip_master_policy')
         self.at_master_timescale_placeholder = tf.placeholder(tf.bool, shape=(),
                                                               name='time_scale')
         self.observation_placeholder = tf.placeholder(tf.float32, shape=[None,
@@ -116,7 +118,10 @@ class RecurrentMLSHV2META(PolicyGradient):
         self.master_chosen_sub_policy_index = tf.placeholder(tf.int32, [None])
 
         self.master_chosen_one_hot = tf.expand_dims(
-            tf.one_hot(self.master_chosen_sub_policy_index, depth=2), axis=2)
+            tf.one_hot(
+                self.master_chosen_sub_policy_index,
+                depth=self.config.num_meta_learning_distinct_tasks),
+            axis=2)
 
         self.final_policy = tf.reduce_sum(
             self.master_chosen_one_hot * self.proposed_sub_policies, axis=1)
@@ -163,18 +168,16 @@ class RecurrentMLSHV2META(PolicyGradient):
 
     def add_optimizer_op(self):
         self.master_adam = tf.train.AdamOptimizer(learning_rate=self.lr)
-        # self.master_train_op = self.master_adam.minimize(self.master_loss,
-        #
-        # var_list=tf.get_collection(
-        #
-        # tf.GraphKeys.TRAINABLE_VARIABLES,
-        #                                                      scope='master'))
+        # self.master_train_op = self.master_adam.minimize(
+        #     self.master_loss,
+        #     var_list=tf.get_collection(
+        #         tf.GraphKeys.TRAINABLE_VARIABLES, scope='master'))
 
         self.subpolicy_adam = tf.train.AdamOptimizer(learning_rate=self.lr)
         self.subpolicy_train_op = self.subpolicy_adam.minimize(
             self.subpolicy_loss,
-            var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
-                                       scope='subpolicy'))
+            var_list=tf.get_collection(
+                tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
 
     def sample_path(self, env, ti, num_episodes=None):
         episode = 0
@@ -184,16 +187,26 @@ class RecurrentMLSHV2META(PolicyGradient):
         self.indices = []
 
         while num_episodes or t < self.config.batch_size:
-            index = np.random.randint(0, 2)
+            index = np.random.randint(0, self.config.num_meta_learning_distinct_tasks)
             if index == 0:
                 state = self.env.reset(seed={
                     'fixedstart+goal:start': (env.nS - env.ncol - 2),
                     'fixedstart+goal:goal': 2
                 })
-            else:
+            elif index == 1:
                 state = self.env.reset(seed={
                     'fixedstart+goal:start': (1 + env.ncol),
                     'fixedstart+goal:goal': (env.nS - 3)
+                })
+            elif index == 2:
+                state = self.env.reset(seed={
+                    'fixedstart+goal:start': (2 * env.ncol - 2),
+                    'fixedstart+goal:goal': (env.nS - env.ncol * 3)
+                })
+            else:
+                state = self.env.reset(seed={
+                    'fixedstart+goal:start': (env.nS - env.ncol * 2 + 1),
+                    'fixedstart+goal:goal': (env.ncol * 3 - 1)
                 })
 
             # print 'task start %s, goal %s' % (self.env.start, self.env.goal)
@@ -355,7 +368,7 @@ class RecurrentMLSHV2META(PolicyGradient):
                     config.visualize_sub_policies:
                     logits = self.sess.run(self.sub_policies, feed_dict={
                         self.observation_placeholder: np.expand_dims(
-                            np.arange(81), axis=1)
+                            np.arange(self.env.nrow * self.env.ncol), axis=1)
                     })
                     plt.clf()
 
@@ -366,11 +379,24 @@ class RecurrentMLSHV2META(PolicyGradient):
                         'fixedstart+goal:goal': 2
                     })
                     envs.append(copy.deepcopy(self.env))
-                    self.env.reset(seed={
-                        'fixedstart+goal:start': (1 + env.ncol),
-                        'fixedstart+goal:goal': (env.nS - 3)
-                    })
-                    envs.append(copy.deepcopy(self.env))
+                    if self.config.num_meta_learning_distinct_tasks >= 2:
+                        self.env.reset(seed={
+                            'fixedstart+goal:start': (1 + env.ncol),
+                            'fixedstart+goal:goal': (env.nS - 3)
+                        })
+                        envs.append(copy.deepcopy(self.env))
+                    if self.config.num_meta_learning_distinct_tasks >= 3:
+                        self.env.reset(seed={
+                            'fixedstart+goal:start': (2 * env.ncol - 2),
+                            'fixedstart+goal:goal': (env.nS - env.ncol * 3)
+                        })
+                        envs.append(copy.deepcopy(self.env))
+                    if self.config.num_meta_learning_distinct_tasks >= 4:
+                        self.env.reset(seed={
+                            'fixedstart+goal:start': (env.nS - env.ncol * 2 + 1),
+                            'fixedstart+goal:goal': (env.ncol * 3 - 1)
+                        })
+                        envs.append(copy.deepcopy(self.env))
 
                     for sub in range(config.num_sub_policies):
                         actions.append(np.argmax(logits[:, sub, :], axis=1))
@@ -378,7 +404,7 @@ class RecurrentMLSHV2META(PolicyGradient):
                     visualize_fourrooms_multi_policy(envs, actions)
 
                     plt.tight_layout()
-                    plt.savefig('plots/subpolicies_%s.png' % get_timestamp())
+                    plt.savefig('plots/subpolicies_%s_task_%s.png' % (get_timestamp(), taski))
 
                     self.save_model_checkpoint(self.sess, self.saver,
                                                os.path.join(
