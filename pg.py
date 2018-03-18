@@ -67,6 +67,8 @@ class PolicyGradient(object):
 
         if not os.path.exists(config.output_path):
             os.makedirs(config.output_path)
+        if not os.path.exists(config.plot_output_dir):
+            os.makedirs(config.plot_output_dir)
 
         self.config = config
         self.logger = logger

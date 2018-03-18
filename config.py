@@ -8,23 +8,6 @@ class config():
             raise Exception()
         self.algorithm = algorithm
 
-        # output_path = "results/%s-bs=%s-algo=%s-usebaseline=%s-lr=%s" \
-        #               "-baselinelayers=%sx%s-num_sub=%s-maxeps=%s-min" \
-        #               "eps=%s-sub_index=%s-freezesub=%s-uniquestr" \
-        #               "=%s-numsublayers=%s-nummasterlayers=%s-max_num_sub" \
-        #               "=%s-weighted_avg=%s-sub_net=%s" \
-        #               "-master_net=%s" \
-        #               "/" % (self.env_name, self.batch_size, self.algorithm,
-        #                      self.use_baseline, self.learning_rate,
-        #                      self.n_layers, self.baseline_layer_size,
-        #                      self.num_sub_policies, self.max_epsilon,
-        #                      self.min_epsilon, self.sub_policy_index,
-        #                      self.freeze_sub_policy, self.unique_key,
-        #                      self.num_sub_policy_layers,
-        # self.num_master_layers,
-        #                      self.max_num_sub_policies, self.weight_average,
-        #                      self.sub_policy_network, self.master_network)
-
         output_path = "results/%s-bs=%s-algo=%s-usebaseline=%s-lr=%s" \
                       "-baselinelayers=%sx%s-num_sub=%s-maxeps=%s-min" \
                       "eps=%s-sub_index=%s-freezesub=%s-uniquestr" \
@@ -47,24 +30,46 @@ class config():
         self.record_path = output_path
         self.output_path = output_path
 
-    do_meta_learning = True
-    num_meta_learning_training_tasks = 1
+        plot_output_dir = "./plots"
+
+    #=================== HRL ===================
+    do_meta_learning = False
+    num_meta_learning_training_tasks = 20
+    # TODO message: Jiayu, this is where you toggle doing viz or not
+    visualize_master_policy = True
+    visualize_sub_policies = True
+    freeze_sub_policy = True
+    sub_policy_index = -1  # -1 means activates master policy
+
+    max_num_sub_policies = 4
+    num_sub_policies = 2
+
+    sub_policy_network = 'LSTM'
+    master_network = 'LSTM'
+    num_sub_policy_layers = 1
+    num_master_layers = 1
+    #=====================================================
+
+    #=================== Meta-Learning ===================
+    do_meta_learning = False
+    num_meta_learning_training_tasks = 20
+
+    # TODO: delte this, four rooms could be randomized.
+    def get_env_name(self):
+        # return "Fourrooms-v" + str(np.random.randint(0, 2))
+        return "Fourrooms-small-v0"
+    #=====================================================
 
     # env_name = "CartPole-v0"
     # env_name = 'BipedalWalker-v2'
     # env_name = "InvertedPendulum-v1"
-    # env_name = "Fourrooms-small-v0"
+    env_name = "Fourrooms-small-v0"
     # env_name = "Fourrooms-medium-v0"
-    env_name = "Fourrooms-large-v0"
+    # env_name = "Fourrooms-large-v0"
 
     # env_name = "HalfCheetah-v1"
     # env_name = "Ant-v1"
     # env_name = "Ant-v2"
-
-    # TODO message: Jiayu, this is where you can choose to alternate envs or not
-    def get_env_name(self):
-        # return "Fourrooms-v" + str(np.random.randint(0, 2))
-        return "Fourrooms-small-v0"
 
     batch_size_by_env = {
         "CartPole-v0": 64,
@@ -110,9 +115,6 @@ class config():
         "BipedalWalker-v2": 1000
     }
 
-    # TODO message: Jiayu, this is where you toggle doing viz or not
-    visualize_master_policy = True
-    visualize_sub_policies = True
 
     # recover_checkpoint_path = None
     recover_checkpoint_path = "results/Fourrooms-large-v0-bs=1000-algo" \
@@ -123,8 +125,6 @@ class config():
     render = False
     max_epsilon = 0.0
     min_epsilon = 0.0
-    freeze_sub_policy = True
-    sub_policy_index = -1  # -1 means activates master policy
     num_batches = num_batches_by_env[env_name]
     batch_size = batch_size_by_env[env_name]
     max_ep_len = min(10000000, batch_size)
@@ -134,14 +134,6 @@ class config():
     normalize_advantage = True
     n_layers = 4
     baseline_layer_size = 32
-    max_num_sub_policies = 4
-    num_sub_policies = 2
-
-    sub_policy_network = 'LSTM'
-    master_network = 'LSTM'
-    num_sub_policy_layers = 1
-    num_master_layers = 1
-
     weight_average = False
     activation = tf.nn.relu
 

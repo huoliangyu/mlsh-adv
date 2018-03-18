@@ -53,6 +53,89 @@ class RecurrentMLSHV2META(PolicyGradient):
         return final_policy
 
 
+    def sample_path(self, env, num_episodes=None):
+        episode = 0
+        episode_rewards = []
+        paths = []
+        t = 0
+        rooms_and_sub_policies = {}
+
+        while num_episodes or t < self.config.batch_size:
+            state = env.reset()
+            states, actions, rewards = [], [], []
+            episode_reward = 0
+            rooms = []
+
+            for step in range(self.config.max_ep_len):
+                states.append(state)
+
+                if str(config.env_name).startswith("Fourrooms"):
+                    room = self.get_room_by_state(state)
+                    rooms.append(room)
+
+                    chosen_sub_policy, action = self.sess.run(
+                        [self.chosen_index, self.sampled_action], feed_dict={
+                            self.observation_placeholder: [[states[-1]]]
+                        })
+                    action = action[0]
+                    chosen_sub_policy = chosen_sub_policy[0]
+                    if room not in rooms_and_sub_policies:
+                        rooms_and_sub_policies[room] = []
+                    rooms_and_sub_policies[room].append(chosen_sub_policy)
+                else:
+                    action = self.sess.run(self.sampled_action, feed_dict={
+                        self.observation_placeholder: states[-1][None]
+                    })
+                    action = action[0]
+
+                action = self.epsilon_greedy(action=action,
+                                             eps=self.get_epsilon(t))
+                if self.config.render:
+                    env.render()
+
+                state, reward, done, info = env.step(action)
+                actions.append(action)
+                rewards.append(reward)
+                episode_reward += reward
+                t += 1
+                if done or step == self.config.max_ep_len - 1:
+                    episode_rewards.append(episode_reward)
+                    break
+                if (not num_episodes) and t == self.config.batch_size:
+                    break
+
+            if str(config.env_name).startswith(
+                "Fourrooms") and self.config.render:
+                print(
+                    [(states[room], rooms[room]) for room in range(len(rooms))])
+                print(Counter(rooms))
+                print(sorted(Counter(rooms), key=lambda i: i[1]))
+                exit()
+
+            path = {
+                "observation": np.array(states), "reward": np.array(rewards),
+                "action": np.array(actions)
+            }
+            paths.append(path)
+            episode += 1
+            if num_episodes and episode >= num_episodes:
+                break
+
+        if str(config.env_name).startswith("Fourrooms"):
+            counter_by_room = {}
+            for room in rooms_and_sub_policies:
+                counter = Counter(rooms_and_sub_policies[room])
+                s = sum([counter[sub] for sub in counter])
+                for sub in range(config.num_sub_policies):
+                    counter[sub] = counter[sub] * 1.0 / s if sub in counter \
+                        else \
+                        0.0
+                    self.plot[room][sub].append(counter[sub])
+                counter_by_room[room] = counter
+            print(counter_by_room)
+
+        return paths, episode_rewards
+
 if __name__ == "__main__":
     if not os.path.exists('./plots'):
         os.makedirs('./plots')
