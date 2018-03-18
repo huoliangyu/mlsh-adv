@@ -107,7 +107,7 @@ class config():
     normalize_advantage = True
     n_layers = 4
     baseline_layer_size = 32
-    max_num_sub_policies = 4
+    max_num_sub_policies = 2
     num_sub_policies = 4
 
     sub_policy_network = 'LSTM'
