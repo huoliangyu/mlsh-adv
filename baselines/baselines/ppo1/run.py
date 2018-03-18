@@ -21,6 +21,9 @@ def train(env_id, num_timesteps, seed, config):
     elif config.algorithm == 'RecurrentMLSHV10':
         from baselines.ppo1.recurrent_mlsh_v10 import RecurrentMLSHV10 as policy
         from baselines.ppo1 import pposgd_simple_alt as pposgd_simple
+    elif config.algorithm == 'RecurrentMLSHV11':
+        from baselines.ppo1.recurrent_mlsh_v11 import RecurrentMLSHV11 as policy
+        from baselines.ppo1 import pposgd_simple_alt as pposgd_simple
     elif config.algorithm == 'mlp_policy':
         from mlp_policy import MlpPolicy as policy
         from baselines.ppo1 import pposgd_simple
@@ -42,7 +45,7 @@ def train(env_id, num_timesteps, seed, config):
 
 
 def main():
-    c = config('RecurrentMLSHV9')
+    c = config('RecurrentMLSHV11')
     logger.configure()
     logger.log(c.output_path)
     train(config.env_name, num_timesteps=3e6, seed=np.random.randint(0, 100000),
