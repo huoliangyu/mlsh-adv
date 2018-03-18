@@ -58,7 +58,7 @@ class config():
 
     lr_by_env = {
         "CartPole-v0": 3e-2, "Fourrooms-v1": 3e-2, "HalfCheetah-v1": 3e-1,
-        "Ant-v1": 3e-2, "Ant-v2": 3e-2, "BipedalWalker-v2": 3e-3
+        "Ant-v1": 3e-2, "Ant-v2": 3e-2, "BipedalWalker-v2": 3e-4
     }
 
     gamma_by_env = {
@@ -107,13 +107,13 @@ class config():
     normalize_advantage = True
     n_layers = 4
     baseline_layer_size = 32
-    max_num_sub_policies = 8
+    max_num_sub_policies = 1
     num_sub_policies = 4
 
     sub_policy_network = 'LSTM'
     master_network = 'LSTM'
-    num_sub_policy_layers = 8
-    num_master_layers = 8
+    num_sub_policy_layers = 1
+    num_master_layers = 1
 
     weight_average = False
     activation = tf.nn.relu

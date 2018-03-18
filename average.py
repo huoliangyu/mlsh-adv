@@ -16,7 +16,7 @@ def walklevel(some_dir, level=1):
 
 
 root = os.path.expanduser('~/Desktop/openai')
-prefix = 'openai-2018-03-17-22-44'
+prefix = 'openai-2018-03-18'
 dirs = walklevel(root, level=2)
 best = []
 for root1, dir1, file1 in dirs:
