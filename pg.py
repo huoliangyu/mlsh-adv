@@ -90,8 +90,6 @@ class PolicyGradient(object):
 
         self.lr = self.config.learning_rate
 
-        self.last_chosen_index = tf.constant(0)
-
         self.build()
 
     def add_placeholders_op(self):

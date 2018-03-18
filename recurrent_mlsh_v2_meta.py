@@ -1,7 +1,7 @@
 import tensorflow.contrib.rnn as rnn
 
 from pg import *
-
+import matplotlib.pyplot as plt
 
 class RecurrentMLSHV2META(PolicyGradient):
     def add_placeholders_op(self):
@@ -17,6 +17,20 @@ class RecurrentMLSHV2META(PolicyGradient):
         # Define a placeholder for advantages
         self.advantage_placeholder = tf.placeholder(tf.float32, shape=None)
         self.master_advantage_placeholder = tf.placeholder(tf.float32, shape=None)
+
+    def build(self):
+        # self.last_chosen_index = tf.constant(0)
+        self.last_chosen_one_hot = tf.one_hot(
+            indices=0,
+            depth=self.config.num_sub_policies)
+
+        self.add_placeholders_op()
+        self.build_policy_network_op()
+        self.add_loss_op()
+        self.add_optimizer_op()
+
+        if self.config.use_baseline:
+            self.add_baseline_op()
 
     def sub_policies_act(self, mlp_input):
         if str(config.env_name).startswith("Fourrooms"):
@@ -51,12 +65,16 @@ class RecurrentMLSHV2META(PolicyGradient):
                                         dtype=tf.float32, scope='master')
         self.master_policy_action_logits = last_output = self.out[:, -1, :]
 
-        self.last_chosen_index = self.chosen_index = tf.argmax(last_output, axis=1)
+        # self.last_chosen_index = self.chosen_index = tf.argmax(last_output, axis=1)
+        self.master_chosen_sub_policy_index = tf.argmax(last_output, axis=1)
 
-        return self.chosen_index
-        # max_output = tf.reduce_max(last_output, axis=1, keep_dims=True)
-        # tmp = tf.nn.relu(last_output - max_output + 1e-17)
-        # self.weights = tmp / tf.reduce_sum(tmp, axis=1, keep_dims=True)
+        # return self.chosen_index
+
+        max_output = tf.reduce_max(last_output, axis=1, keep_dims=True)
+        tmp = tf.nn.relu(last_output - max_output + 1e-17)
+        self.weights = tmp / tf.reduce_sum(tmp, axis=1, keep_dims=True)
+        self.last_chosen_one_hot = chosen_one_hot = tf.expand_dims(self.weights, axis=2)
+        return chosen_one_hot
 
         # final_policy = tf.reduce_sum(
         #     tf.expand_dims(self.weights, axis=2) * self.proposed_sub_policies,
@@ -70,19 +88,25 @@ class RecurrentMLSHV2META(PolicyGradient):
 
     def build_policy_network_op(self, scope="policy_network"):
         self.proposed_sub_policies = self.sub_policies_act(self.observation_placeholder)
-        self.master_chosen_sub_policy_index = tf.cond(
-            self.at_master_timescale_placeholder,
-            lambda: self.master_policy_act(self.proposed_sub_policies),
-            lambda: tf.identity(self.last_chosen_index))
+        # self.master_chosen_one_hot = tf.cond(
+        #     self.at_master_timescale_placeholder,
+        #     lambda: self.master_policy_act(self.proposed_sub_policies),
+        #     lambda: tf.identity(self.last_chosen_one_hot))
+        # self.master_chosen_sub_policy_index = self.master_policy_act(self.proposed_sub_policies)
+        self.master_chosen_one_hot = self.master_policy_act(self.proposed_sub_policies)
 
-        self.sub_policy_weights = tf.one_hot(
-            indices=self.master_chosen_sub_policy_index,
-            depth=self.config.num_sub_policies)
+        # self.sub_policy_weights = tf.one_hot(
+        #     indices=self.master_chosen_sub_policy_index,
+        #     depth=self.config.num_sub_policies)
+        # self.final_policy = tf.reduce_sum(
+        #     tf.expand_dims(self.sub_policy_weights, axis=2) * self.proposed_sub_policies,
+        #     axis=1)
         self.final_policy = tf.reduce_sum(
-            tf.expand_dims(self.sub_policy_weights, axis=2) * self.proposed_sub_policies,
+            self.master_chosen_one_hot * self.proposed_sub_policies,
             axis=1)
-        if config.sub_policy_index > -1:
-            self.final_policy = self.proposed_sub_policies[:, config.sub_policy_index, :]
+
+        # if config.sub_policy_index > -1:
+        #     self.final_policy = self.proposed_sub_policies[:, config.sub_policy_index, :]
 
 
         if self.discrete:
@@ -127,7 +151,7 @@ class RecurrentMLSHV2META(PolicyGradient):
         self.subpolicy_adam = tf.train.AdamOptimizer(learning_rate=self.lr)
         self.subpolicy_train_op = self.subpolicy_adam.minimize(
             self.subpolicy_loss,
-            var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='master'))
+            var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
 
     def sample_path(self, env, num_episodes=None):
         episode = 0
@@ -150,7 +174,7 @@ class RecurrentMLSHV2META(PolicyGradient):
                     rooms.append(room)
 
                     chosen_sub_policy, action = self.sess.run(
-                        [self.chosen_index, self.sampled_action], feed_dict={
+                        [self.master_chosen_sub_policy_index, self.sampled_action], feed_dict={
                             self.at_master_timescale_placeholder: (step % self.config.master_timescale == 0),
                             self.observation_placeholder: [[states[-1]]]
                         })
@@ -215,7 +239,8 @@ class RecurrentMLSHV2META(PolicyGradient):
 
 
     def train(self):
-        import matplotlib.pyplot as plt
+        print '===================== in RecurrentMLSHV2META.train ====================='
+
         last_record = 0
 
         self.init_averages()
