@@ -366,16 +366,17 @@ class RecurrentMLSHV2META(PolicyGradient):
                 if self.config.use_baseline:
                     self.update_baseline(returns, observations)
 
-                self.sess.run(self.master_train_op, feed_dict={
-                    # self.at_master_timescale_placeholder: True,
-                    self.observation_placeholder: observations,
-                    self.action_placeholder: actions,
-                    self.master_advantage_placeholder: master_advantages,
-                    # self.master_advantage_placeholder: advantages,
-                    self.task_choices_placeholder: self.task_choices,
-                })
+                if not self.initial_task:
+                    self.sess.run(self.master_train_op, feed_dict={
+                        # self.at_master_timescale_placeholder: True,
+                        self.observation_placeholder: observations,
+                        self.action_placeholder: actions,
+                        self.master_advantage_placeholder: master_advantages,
+                        # self.master_advantage_placeholder: advantages,
+                        self.task_choices_placeholder: self.task_choices,
+                    })
 
-                if t >= self.config.warmup:
+                if t >= self.config.warmup or self.initial_task:
                     self.sess.run(self.subpolicy_train_op, feed_dict={
                         # self.at_master_timescale_placeholder: True,
                         self.observation_placeholder: observations,
