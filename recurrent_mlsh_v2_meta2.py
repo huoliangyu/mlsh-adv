@@ -22,10 +22,8 @@ class RecurrentMLSHV2META(PolicyGradient):
             raise Exception()
 
     def add_placeholders_op(self):
-        self.skip_master_policy_placeholder = tf.placeholder(tf.bool, shape=(),
-                                                              name='skip_master_policy')
-        self.at_master_timescale_placeholder = tf.placeholder(tf.bool, shape=(),
-                                                              name='time_scale')
+        # self.skip_master_policy_placeholder = tf.placeholder(tf.bool, shape=(), name='skip_master_policy')
+        # self.at_master_timescale_placeholder = tf.placeholder(tf.bool, shape=(), name='time_scale')
         self.observation_placeholder = tf.placeholder(tf.float32, shape=[None,
                                                                          self.observation_dim])
         if self.discrete:
@@ -38,6 +36,8 @@ class RecurrentMLSHV2META(PolicyGradient):
         self.advantage_placeholder = tf.placeholder(tf.float32, shape=None)
         self.master_advantage_placeholder = tf.placeholder(tf.float32,
                                                            shape=None)
+
+        self.chosen_sub_policy_index_placeholder = tf.placeholder(tf.int32, [None])
 
     def build(self):
         # self.last_chosen_index = tf.constant(0)
@@ -102,29 +102,21 @@ class RecurrentMLSHV2META(PolicyGradient):
         self.proposed_sub_policies = self.sub_policies_act(
             self.observation_placeholder)
 
-        # master_timescale_mask = tf.cast(self.at_master_timescale_placeholder,
-        #                                 tf.float32)
-        # self.master_chosen_one_hot = master_timescale_mask * \
-        #                              self.master_policy_act(
-        #     self.proposed_sub_policies) + (
-        #                                       1 - master_timescale_mask) * \
-        #                                   tf.identity(
-        #     self.last_chosen_one_hot)
-        # self.master_chosen_one_hot = self.master_policy_act(
-        # self.proposed_sub_policies)
+        # master_timescale_mask = tf.cast(self.at_master_timescale_placeholder, tf.float32)
+        # self.master_chosen_one_hot = master_timescale_mask * self.master_policy_act(self.proposed_sub_policies) + (1 - master_timescale_mask) * tf.identity(self.last_chosen_one_hot)
+        # self.master_chosen_one_hot = self.master_policy_act(self.proposed_sub_policies)
+        self.master_chosen_one_hot = self.master_policy_act(self.proposed_sub_policies)
+        self.master_chosen_sub_policy_index = tf.argmax(self.master_policy_action_logits, axis=1)
+        
 
-        # self.master_chosen_sub_policy_index = tf.argmax(
-        # self.master_policy_action_logits, axis=1)
-        self.master_chosen_sub_policy_index = tf.placeholder(tf.int32, [None])
-
-        self.master_chosen_one_hot = tf.expand_dims(
+        self.chosen_one_hot = tf.expand_dims(
             tf.one_hot(
-                self.master_chosen_sub_policy_index,
+                self.chosen_sub_policy_index_placeholder,
                 depth=self.config.num_meta_learning_distinct_tasks),
             axis=2)
 
         self.final_policy = tf.reduce_sum(
-            self.master_chosen_one_hot * self.proposed_sub_policies, axis=1)
+            self.chosen_one_hot * self.proposed_sub_policies, axis=1)
 
         if self.discrete:
             self.action_logits = self.final_policy
@@ -133,10 +125,9 @@ class RecurrentMLSHV2META(PolicyGradient):
             self.logprob = -tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=self.action_placeholder, logits=self.action_logits)
 
-            # self.master_logprob = \
-            #     -tf.nn.sparse_softmax_cross_entropy_with_logits(
-            #     labels=self.master_chosen_sub_policy_index,
-            #     logits=self.master_policy_action_logits)
+            self.master_logprob = -tf.nn.sparse_softmax_cross_entropy_with_logits(
+                labels=self.master_chosen_sub_policy_index,
+                logits=self.master_policy_action_logits)
         else:
             action_means = self.final_policy
             log_std = tf.get_variable('log_std', shape=[self.action_dim],
@@ -152,8 +143,8 @@ class RecurrentMLSHV2META(PolicyGradient):
         self.subpolicy_loss = -tf.reduce_mean(
             self.logprob * self.advantage_placeholder)
 
-        # self.master_loss = -tf.reduce_mean(
-        #     self.master_logprob * self.master_advantage_placeholder)
+        self.master_loss = -tf.reduce_mean(
+            self.master_logprob * self.master_advantage_placeholder)
 
     # extract adv at every N timestep
     def calculate_master_advantage(self, adv):
@@ -168,10 +159,10 @@ class RecurrentMLSHV2META(PolicyGradient):
 
     def add_optimizer_op(self):
         self.master_adam = tf.train.AdamOptimizer(learning_rate=self.lr)
-        # self.master_train_op = self.master_adam.minimize(
-        #     self.master_loss,
-        #     var_list=tf.get_collection(
-        #         tf.GraphKeys.TRAINABLE_VARIABLES, scope='master'))
+        self.master_train_op = self.master_adam.minimize(
+            self.master_loss,
+            var_list=tf.get_collection(
+                tf.GraphKeys.TRAINABLE_VARIABLES, scope='master'))
 
         self.subpolicy_adam = tf.train.AdamOptimizer(learning_rate=self.lr)
         self.subpolicy_train_op = self.subpolicy_adam.minimize(
@@ -186,38 +177,41 @@ class RecurrentMLSHV2META(PolicyGradient):
         t = 0
         self.indices = []
 
+        chosen_sub_policy_index = np.random.randint(0, self.config.num_sub_policies)
+
         while num_episodes or t < self.config.batch_size:
-            index = np.random.randint(0, self.config.num_meta_learning_distinct_tasks)
-            if index == 0:
-                state = self.env.reset(seed={
-                    'fixedstart+goal:start': (env.nS - env.ncol - 2),
-                    'fixedstart+goal:goal': 2
-                })
-            elif index == 1:
-                state = self.env.reset(seed={
-                    'fixedstart+goal:start': (1 + env.ncol),
-                    'fixedstart+goal:goal': (env.nS - 3)
-                })
-            elif index == 2:
-                state = self.env.reset(seed={
-                    'fixedstart+goal:start': (2 * env.ncol - 2),
-                    'fixedstart+goal:goal': (env.nS - env.ncol * 3)
-                })
-            else:
-                state = self.env.reset(seed={
-                    'fixedstart+goal:start': (env.nS - env.ncol * 2 + 1),
-                    'fixedstart+goal:goal': (env.ncol * 3 - 1)
-                })
+            # index = np.random.randint(0, self.config.num_meta_learning_distinct_tasks)
+            # if index == 0:
+            #     state = self.env.reset(seed={
+            #         'fixedstart+goal:start': (env.nS - env.ncol - 2),
+            #         'fixedstart+goal:goal': 2
+            #     })
+            # elif index == 1:
+            #     state = self.env.reset(seed={
+            #         'fixedstart+goal:start': (1 + env.ncol),
+            #         'fixedstart+goal:goal': (env.nS - 3)
+            #     })
+            # elif index == 2:
+            #     state = self.env.reset(seed={
+            #         'fixedstart+goal:start': (2 * env.ncol - 2),
+            #         'fixedstart+goal:goal': (env.nS - env.ncol * 3)
+            #     })
+            # else:
+            #     state = self.env.reset(seed={
+            #         'fixedstart+goal:start': (env.nS - env.ncol * 2 + 1),
+            #         'fixedstart+goal:goal': (env.ncol * 3 - 1)
+            #     })
 
             # print 'task start %s, goal %s' % (self.env.start, self.env.goal)
 
+            state = env.reset()
             states, actions, rewards = [], [], []
             episode_reward = 0
             rooms = []
 
             for step in range(self.config.max_ep_len):
                 states.append(state)
-                self.indices.append(index)
+                # self.indices.append(index)
 
                 is_at_master_timescale = False
                 if step % self.config.master_timescale == 0:
@@ -227,11 +221,16 @@ class RecurrentMLSHV2META(PolicyGradient):
                     room = self.get_room_by_state(state)
                     rooms.append(room)
 
+                    if is_at_master_timescale:
+                        chosen_sub_policy_index = self.sess.run(self.master_chosen_sub_policy_index, feed_dict={
+                            self.observation_placeholder: [[states[-1]]],
+                        })
+                        chosen_sub_policy_index = chosen_sub_policy_index[0]
+
                     action = self.sess.run(self.sampled_action, feed_dict={
-                        self.at_master_timescale_placeholder:
-                            is_at_master_timescale,
+                        # self.at_master_timescale_placeholder: is_at_master_timescale,
                         self.observation_placeholder: [[states[-1]]],
-                        self.master_chosen_sub_policy_index: [index]
+                        self.chosen_sub_policy_index_placeholder: [chosen_sub_policy_index]
                     })
                     action = action[0]
                 else:
@@ -239,6 +238,8 @@ class RecurrentMLSHV2META(PolicyGradient):
                         self.observation_placeholder: states[-1][None]
                     })
                     action = action[0]
+
+                self.indices.append(chosen_sub_policy_index)
 
                 action = self.epsilon_greedy(action=action,
                                              eps=self.get_epsilon(ti))
@@ -276,8 +277,7 @@ class RecurrentMLSHV2META(PolicyGradient):
         return paths, episode_rewards
 
     def train(self):
-        print '===================== in RecurrentMLSHV2META.train ' \
-              '====================='
+        print '===================== in RecurrentMLSHV2META.train ====================='
 
         last_record = 0
 
@@ -300,6 +300,31 @@ class RecurrentMLSHV2META(PolicyGradient):
         for taski in xrange(num_tasks):
             print '===================== task #%s =====================' % taski
 
+            if self.config.do_meta_learning:
+                sampled_task = np.random.randint(0, self.config.num_meta_learning_distinct_tasks)
+                if sampled_task == 0:
+                    self.env.reset(seed={
+                        'fixedstart+goal:start': (env.nS - env.ncol - 2),
+                        'fixedstart+goal:goal': 2
+                    })
+                elif sampled_task == 1:
+                    self.env.reset(seed={
+                        'fixedstart+goal:start': (1 + env.ncol),
+                        'fixedstart+goal:goal': (env.nS - 3)
+                    })
+                elif sampled_task == 2:
+                    self.env.reset(seed={
+                        'fixedstart+goal:start': (2 * env.ncol - 2),
+                        'fixedstart+goal:goal': (env.nS - env.ncol * 3)
+                    })
+                else:
+                    self.env.reset(seed={
+                        'fixedstart+goal:start': (env.nS - env.ncol * 2 + 1),
+                        'fixedstart+goal:goal': (env.ncol * 3 - 1)
+                    })
+
+            print 'task start %s, goal %s' % (self.env.start, self.env.goal)
+
             for t in range(self.config.num_batches):
                 print 'train iter #%s: (epsilon: %s)' % (t, self.get_epsilon(t))
                 paths, total_rewards = self.sample_path(env=self.env, ti=t)
@@ -318,29 +343,28 @@ class RecurrentMLSHV2META(PolicyGradient):
                 rewards = np.concatenate([path["reward"] for path in paths])
                 returns = self.get_returns(paths)
                 advantages = self.calculate_advantage(returns, observations)
-                # master_advantages = self.calculate_master_advantage(
-                # advantages)
+                master_advantages = self.calculate_master_advantage(advantages)
 
                 if self.config.use_baseline:
                     self.update_baseline(returns, observations)
 
-                # self.sess.run(self.master_train_op, feed_dict={
-                #     self.at_master_timescale_placeholder: True,
-                #     self.observation_placeholder: observations,
-                #     self.action_placeholder: actions,
-                #     self.master_advantage_placeholder: master_advantages,
-                #     self.master_chosen_sub_policy_index: indices
-                #     # self.master_advantage_placeholder: advantages,
-                # })
-
-                # if t >= self.config.warmup:
-                self.sess.run(self.subpolicy_train_op, feed_dict={
-                    self.at_master_timescale_placeholder: True,
+                self.sess.run(self.master_train_op, feed_dict={
+                    # self.at_master_timescale_placeholder: True,
                     self.observation_placeholder: observations,
                     self.action_placeholder: actions,
-                    self.advantage_placeholder: advantages,
-                    self.master_chosen_sub_policy_index: self.indices
+                    self.master_advantage_placeholder: master_advantages,
+                    # self.chosen_sub_policy_index_placeholder: self.indices
+                    # self.master_advantage_placeholder: advantages,
                 })
+
+                if t >= self.config.warmup:
+                    self.sess.run(self.subpolicy_train_op, feed_dict={
+                        # self.at_master_timescale_placeholder: True,
+                        self.observation_placeholder: observations,
+                        self.action_placeholder: actions,
+                        self.advantage_placeholder: advantages,
+                        self.chosen_sub_policy_index_placeholder: self.indices
+                    })
 
                 if t % self.config.summary_freq == 0:
                     self.update_averages(total_rewards, scores_eval)

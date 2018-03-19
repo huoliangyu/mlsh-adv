@@ -39,8 +39,8 @@ class config():
     freeze_sub_policy = True
     sub_policy_index = -1  # -1 means activates master policy
 
-    max_num_sub_policies = 4
-    num_sub_policies = 4
+    max_num_sub_policies = 2
+    num_sub_policies = 2
 
     sub_policy_network = 'LSTM'
     master_network = 'LSTM'
@@ -49,13 +49,13 @@ class config():
 
     master_timescale = 4
 
-    # warmup =
+    warmup = 40
     #=====================================================
 
     #=================== Meta-Learning ===================
     do_meta_learning = True
-    num_meta_learning_distinct_tasks = 4
-    num_meta_learning_training_tasks = 16
+    num_meta_learning_distinct_tasks = 2
+    num_meta_learning_training_tasks = 10
     #=====================================================
 
     # env_name = "CartPole-v0"
@@ -112,9 +112,6 @@ class config():
         "Ant-v2": 1000,
         "BipedalWalker-v2": 1000
     }
-
-    warmup = 50
-
 
     recover_checkpoint_path = None
     # recover_checkpoint_path = "results/Fourrooms-large-v0-bs=1000-algo" \
