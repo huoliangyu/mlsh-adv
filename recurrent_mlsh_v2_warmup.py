@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import tensorflow.contrib.rnn as rnn
 
 from pg import *
-from visualize import visualize_fourrooms_sub_policy
+from visualize import visualize_fourrooms_master_policy, \
+    visualize_fourrooms_sub_policy
 
 
 class RecurrentMLSHV2META(PolicyGradient):
@@ -22,8 +23,8 @@ class RecurrentMLSHV2META(PolicyGradient):
             raise Exception()
 
     def add_placeholders_op(self):
-        self.at_master_timescale_placeholder = tf.placeholder(tf.bool, shape=(),
-                                                              name='time_scale')
+        self.choices_placeholder = tf.placeholder(tf.int32, shape=[None, 1],
+                                                  name='time_scale')
         self.observation_placeholder = tf.placeholder(tf.float32, shape=[None,
                                                                          self.observation_dim])
         if self.discrete:
@@ -32,13 +33,9 @@ class RecurrentMLSHV2META(PolicyGradient):
             self.action_placeholder = tf.placeholder(tf.float32, shape=[None,
                                                                         self.action_dim])
 
-        # Define a placeholder for advantages
         self.advantage_placeholder = tf.placeholder(tf.float32, shape=None)
-        self.master_advantage_placeholder = tf.placeholder(tf.float32,
-                                                           shape=None)
 
     def build(self):
-        # self.last_chosen_index = tf.constant(0)
         self.last_chosen_one_hot = tf.one_hot(indices=0,
                                               depth=self.config.num_sub_policies)
 
@@ -78,77 +75,53 @@ class RecurrentMLSHV2META(PolicyGradient):
 
         self.proposed_sub_policies = sub_policies
 
-        concatenated = tf.concat(
-            [self.proposed_sub_policies, self.state_embedding], axis=2)
+        # concatenated = tf.concat(
+        #     [self.proposed_sub_policies, self.state_embedding], axis=2)
+        concatenated = self.state_embedding
 
         self.out, _ = tf.nn.dynamic_rnn(cell=lstm_cell, inputs=concatenated,
                                         dtype=tf.float32, scope='master')
         self.master_policy_action_logits = last_output = self.out[:, -1, :]
 
-        # self.last_chosen_index = self.chosen_index = tf.argmax(last_output,
-        #  axis=1)
-        # self.master_chosen_sub_policy_index = tf.argmax(last_output, axis=1)
+        self.master_policy_action_logits = tf.gather_nd(
+            params=self.master_policy_action_logits,
+            indices=self.choices_placeholder)
 
-        max_output = tf.reduce_max(last_output, axis=1, keep_dims=True)
-        tmp = tf.nn.relu(last_output - max_output + 1e-17)
-        self.weights = tmp / tf.reduce_sum(tmp, axis=1, keep_dims=True)
-        self.last_chosen_one_hot = chosen_one_hot = tf.expand_dims(self.weights,
-                                                                   axis=2)
-        return chosen_one_hot
+        # max_output = tf.reduce_max(last_output, axis=1, keep_dims=True)
+        # tmp = tf.nn.relu(last_output - max_output + 1e-6)
+        # self.weights = tmp / tf.reduce_sum(tmp, axis=1, keep_dims=True)
+        self.weights = tf.nn.softmax(self.master_policy_action_logits, axis=1)
+
+        return self.weights
 
     def build_policy_network_op(self, scope="policy_network"):
         self.proposed_sub_policies = self.sub_policies_act(
             self.observation_placeholder)
 
-        # master_timescale_mask = tf.cast(self.at_master_timescale_placeholder,
-        #                                 tf.float32)
-        # self.master_chosen_one_hot = master_timescale_mask * \
-        #                              self.master_policy_act(
-        #     self.proposed_sub_policies) + (
-        #                                       1 - master_timescale_mask) * \
-        #                                   tf.identity(
-        #     self.last_chosen_one_hot)
-        # self.master_chosen_one_hot = self.master_policy_act(
-        # self.proposed_sub_policies)
+        self.master_chosen_one_hot = self.master_policy_act(
+            self.proposed_sub_policies)
 
-        # self.master_chosen_sub_policy_index = tf.argmax(
-        # self.master_policy_action_logits, axis=1)
-        self.master_chosen_sub_policy_index = tf.placeholder(tf.int32, [None])
-
-        self.master_chosen_one_hot = tf.expand_dims(
-            tf.one_hot(self.master_chosen_sub_policy_index, depth=2), axis=2)
+        self.master_chosen_sub_policy_index = tf.argmax(
+            self.master_policy_action_logits, axis=1)
 
         self.final_policy = tf.reduce_sum(
-            self.master_chosen_one_hot * self.proposed_sub_policies, axis=1)
+            tf.expand_dims(self.master_chosen_one_hot,
+                           axis=2) * self.proposed_sub_policies, axis=1)
 
-        if self.discrete:
-            self.action_logits = self.final_policy
-            self.sampled_action = tf.squeeze(
-                tf.multinomial(self.action_logits, 1), axis=1)
-            self.logprob = -tf.nn.sparse_softmax_cross_entropy_with_logits(
-                labels=self.action_placeholder, logits=self.action_logits)
+        self.action_logits = self.final_policy
 
-            # self.master_logprob = \
-            #     -tf.nn.sparse_softmax_cross_entropy_with_logits(
-            #     labels=self.master_chosen_sub_policy_index,
-            #     logits=self.master_policy_action_logits)
-        else:
-            action_means = self.final_policy
-            log_std = tf.get_variable('log_std', shape=[self.action_dim],
-                                      trainable=True)
-            action_std = tf.exp(log_std)
-            multivariate = tfd.MultivariateNormalDiag(loc=action_means,
-                                                      scale_diag=action_std)
-            self.sampled_action = tf.random_normal(
-                [self.action_dim]) * action_std + action_means
-            self.logprob = multivariate.log_prob(self.action_placeholder)
+        self.sampled_action = tf.squeeze(tf.multinomial(self.action_logits, 1),
+                                         axis=1)
+
+        self.action_logits_tmp = tf.placeholder(tf.float32,
+                                                [None, self.action_dim])
+        self.sampled_action_tmp = tf.squeeze(
+            tf.multinomial(self.action_logits_tmp, 1), axis=1)
+        self.logprob = -tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=self.action_placeholder, logits=self.action_logits)
 
     def add_loss_op(self):
-        self.subpolicy_loss = -tf.reduce_mean(
-            self.logprob * self.advantage_placeholder)
-
-        # self.master_loss = -tf.reduce_mean(
-        #     self.master_logprob * self.master_advantage_placeholder)
+        self.loss = -tf.reduce_mean(self.logprob * self.advantage_placeholder)
 
     # extract adv at every N timestep
     def calculate_master_advantage(self, adv):
@@ -163,74 +136,58 @@ class RecurrentMLSHV2META(PolicyGradient):
 
     def add_optimizer_op(self):
         self.master_adam = tf.train.AdamOptimizer(learning_rate=self.lr)
-        # self.master_train_op = self.master_adam.minimize(self.master_loss,
-        #
-        # var_list=tf.get_collection(
-        #
-        # tf.GraphKeys.TRAINABLE_VARIABLES,
-        #                                                      scope='master'))
-
-        self.subpolicy_adam = tf.train.AdamOptimizer(learning_rate=self.lr)
-        self.subpolicy_train_op = self.subpolicy_adam.minimize(
-            self.subpolicy_loss,
-            var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
-                                       scope='subpolicy'))
+        self.train_op = self.master_adam.minimize(self.loss,
+                                                  var_list=tf.get_collection(
+                                                      tf.GraphKeys.TRAINABLE_VARIABLES,
+                                                      scope='master'))
 
     def sample_path(self, env, ti, num_episodes=None):
         episode = 0
         episode_rewards = []
         paths = []
         t = 0
-        self.indices = []
+        at_time_scales = []
+        sub_policy_choice = None
 
         while num_episodes or t < self.config.batch_size:
-            index = np.random.randint(0, 2)
-            if index == 0:
-                state = self.env.reset(seed={
-                    'fixedstart+goal:start': (env.nS - env.ncol - 1),
-                    'fixedstart+goal:goal': 2
-                })
-            else:
-                state = self.env.reset(seed={
-                    'fixedstart+goal:start': (1 + env.ncol),
-                    'fixedstart+goal:goal': (env.nS - 3)
-                })
-
-            # print 'task start %s, goal %s' % (self.env.start, self.env.goal)
-
+            state = self.env.reset()
             states, actions, rewards = [], [], []
             episode_reward = 0
             rooms = []
 
             for step in range(self.config.max_ep_len):
                 states.append(state)
-                self.indices.append(index)
 
-                is_at_master_timescale = False
+                is_at_master_timescale = 0
                 if step % self.config.master_timescale == 0:
-                    is_at_master_timescale = True
+                    is_at_master_timescale = 1
 
-                if str(config.env_name).startswith("Fourrooms"):
-                    room = self.get_room_by_state(state)
-                    rooms.append(room)
+                at_time_scales.append(is_at_master_timescale)
 
-                    action = self.sess.run(self.sampled_action, feed_dict={
-                        self.at_master_timescale_placeholder:
-                            is_at_master_timescale,
-                        self.observation_placeholder: [[states[-1]]],
-                        self.master_chosen_sub_policy_index: [index]
-                    })
+                room = self.get_room_by_state(state)
+                rooms.append(room)
+
+                if is_at_master_timescale == 1:
+                    chosen_sub, action = self.sess.run(
+                        [self.master_chosen_one_hot, self.sampled_action],
+                        feed_dict={
+                            self.choices_placeholder: [[0]],
+                            self.observation_placeholder: [[states[-1]]]
+                        })
                     action = action[0]
-                else:
-                    action = self.sess.run(self.sampled_action, feed_dict={
-                        self.observation_placeholder: states[-1][None]
-                    })
-                    action = action[0]
+                    chosen_sub = chosen_sub[0]
+                    sub_policy_choice = np.argmax(chosen_sub)
+                elif is_at_master_timescale == 0:
+                    chosen_sub = sub_policy_choice
+                    action_logits = self.sess.run(self.proposed_sub_policies,
+                                                  feed_dict={
+                                                      self.observation_placeholder: [
+                                                          [states[-1]]]
+                                                  })[:, chosen_sub, :]
 
-                action = self.epsilon_greedy(action=action,
-                                             eps=self.get_epsilon(ti))
-                if self.config.render:
-                    env.render()
+                    action = self.sess.run(self.sampled_action_tmp, feed_dict={
+                        self.action_logits_tmp: action_logits
+                    })[0]
 
                 state, reward, done, info = env.step(action)
                 actions.append(action)
@@ -260,6 +217,23 @@ class RecurrentMLSHV2META(PolicyGradient):
             if num_episodes and episode >= num_episodes:
                 break
 
+        indices = range(config.batch_size)
+
+        last_index = [0]
+
+        self.choices = []
+
+        assert at_time_scales[0] == 1
+
+        for i in range(config.batch_size):
+            if at_time_scales[i] == 1:
+                choice = [indices[i]]
+                last_index = choice
+            else:
+                choice = last_index
+
+            self.choices.append(choice)
+
         return paths, episode_rewards
 
     def train(self):
@@ -278,18 +252,34 @@ class RecurrentMLSHV2META(PolicyGradient):
         if self.config.do_meta_learning:
             num_tasks = self.config.num_meta_learning_training_tasks
 
-        # old = self.sess.run(tf.get_collection(
-        #     tf.GraphKeys.TRAINABLE_VARIABLES, scope='subpolicy'))
-
         print 'self.config.do_meta_learning = %s' % self.config.do_meta_learning
         print 'num_tasks = %s' % num_tasks
 
+        master_policies = {}
+
         for taski in xrange(num_tasks):
+            self.sess.run(self.init)
+
+            if config.recover_checkpoint_path:
+                print("Recovering model...")
+                self.recover_model_checkpoint(self.sess, self.saver,
+                                              config.recover_checkpoint_path)
+
+            index = np.random.randint(0, 2)
+            if index == 0:
+                self.env.reset(seed={
+                    'fixedstart+goal:start': (env.nS - env.ncol - 1),
+                    'fixedstart+goal:goal': 2
+                })
+            else:
+                self.env.reset(seed={
+                    'fixedstart+goal:start': (1 + env.ncol),
+                    'fixedstart+goal:goal': (env.nS - 3)
+                })
 
             for t in range(self.config.num_batches):
-                # print(t, self.get_epsilon(t))
                 print 'train iter #%s:' % t
-                print(t, self.get_epsilon(t))
+                print(t, self.get_epsilon(t), self.env.goal)
                 paths, total_rewards = self.sample_path(env=self.env, ti=t)
 
                 scores_eval += total_rewards
@@ -302,33 +292,22 @@ class RecurrentMLSHV2META(PolicyGradient):
                     observations = np.concatenate(
                         [path["observation"] for path in paths])
 
-                actions = np.concatenate([path["action"] for path in paths])
+                sub_policy_actions = np.concatenate(
+                    [path["action"] for path in paths])
                 rewards = np.concatenate([path["reward"] for path in paths])
                 returns = self.get_returns(paths)
                 advantages = self.calculate_advantage(returns, observations)
-                # master_advantages = self.calculate_master_advantage(
-                # advantages)
 
                 if self.config.use_baseline:
                     self.update_baseline(returns, observations)
 
-                # self.sess.run(self.master_train_op, feed_dict={
-                #     self.at_master_timescale_placeholder: True,
-                #     self.observation_placeholder: observations,
-                #     self.action_placeholder: actions,
-                #     self.master_advantage_placeholder: master_advantages,
-                #     self.master_chosen_sub_policy_index: indices
-                #     # self.master_advantage_placeholder: advantages,
-                # })
-
-                # if t >= self.config.warmup:
-                self.sess.run(self.subpolicy_train_op, feed_dict={
-                    self.at_master_timescale_placeholder: True,
-                    self.observation_placeholder: observations,
-                    self.action_placeholder: actions,
-                    self.advantage_placeholder: advantages,
-                    self.master_chosen_sub_policy_index: self.indices
-                })
+                ret, _ = self.sess.run(
+                    [self.master_chosen_one_hot, self.train_op], feed_dict={
+                        self.choices_placeholder: self.choices,
+                        self.observation_placeholder: observations,
+                        self.action_placeholder: sub_policy_actions,
+                        self.advantage_placeholder: advantages
+                    })
 
                 if t % self.config.summary_freq == 0:
                     self.update_averages(total_rewards, scores_eval)
@@ -352,16 +331,21 @@ class RecurrentMLSHV2META(PolicyGradient):
 
                 # TODO: Message for Jiayu: This is the subpolicy viz code
 
-                if t == config.num_batches - 1 and \
-                    config.viz_sub_policies:
-                    logits = self.sess.run(self.sub_policies, feed_dict={
-                        self.observation_placeholder: np.expand_dims(
-                            np.arange(81), axis=1)
-                    })
-                    plt.clf()
+                if t == config.num_batches - 1 and config.viz_sub_policies:
+                    master_actions, logits = self.sess.run(
+                        [self.master_chosen_sub_policy_index,
+                         self.sub_policies], feed_dict={
+                            self.observation_placeholder: np.expand_dims(
+                                np.arange(81), axis=1),
+                            self.choices_placeholder: [[i] for i in range(81)]
+                        })
 
-                    actions = []
+                    master_policies[index] = master_actions
+
+                    plt.clf()
+                    sub_policy_actions = []
                     envs = []
+
                     self.env.reset(seed={
                         'fixedstart+goal:start': (env.nS - env.ncol - 1),
                         'fixedstart+goal:goal': 2
@@ -374,12 +358,21 @@ class RecurrentMLSHV2META(PolicyGradient):
                     envs.append(copy.deepcopy(self.env))
 
                     for sub in range(config.num_sub_policies):
-                        actions.append(np.argmax(logits[:, sub, :], axis=1))
+                        sub_policy_actions.append(
+                            np.argmax(logits[:, sub, :], axis=1))
 
-                    visualize_fourrooms_sub_policy(envs, actions)
+                    visualize_fourrooms_sub_policy(envs, sub_policy_actions)
 
                     plt.tight_layout()
                     plt.savefig('plots/subpolicies_%s.png' % get_timestamp())
+
+                    if 0 in master_policies and 1 in master_policies:
+                        plt.clf()
+                        visualize_fourrooms_master_policy(envs,
+                                                          [master_policies[0],
+                                                           master_policies[1]])
+                        plt.tight_layout()
+                        plt.savefig('plots/master_%s.png' % get_timestamp())
 
                     self.save_model_checkpoint(self.sess, self.saver,
                                                os.path.join(
@@ -387,32 +380,38 @@ class RecurrentMLSHV2META(PolicyGradient):
 
                                                    'model.ckpt'), t)
 
-        self.logger.info("- Training done.")
-        export_plot(scores_eval, "Score", config.env_name,
-                    self.config.plot_output)
-        export_plot(scores_eval, "Score", config.env_name,
-                    "plots/score_%s.png" % get_timestamp())
+                    self.logger.info("- Training done.")
+                    export_plot(scores_eval, "Score", config.env_name,
+                                self.config.plot_output)
+                    export_plot(scores_eval, "Score", config.env_name,
+                                "plots/score_%s.png" % get_timestamp())
 
-        if str(config.env_name).startswith(
-            "Fourrooms") and config.visualize_master_policy:
-            plt.rcParams["figure.figsize"] = [12, 12]
-            f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, sharex='col',
-                                                       sharey='row')
-            axes = {'room0': ax1, 'room1': ax2, 'room2': ax3, 'room3': ax4}
-            for room in self.plot:
-                axes[room].set_title(room, size=20)
-                for sub in range(config.num_sub_policies):
-                    prob_list = self.plot[room][sub]
-                    axes[room].plot(range(len(prob_list)), prob_list,
-                                    linewidth=5)
-                axes[room].legend(['subpolicy' + str(sub) for sub in
-                                   range(config.num_sub_policies)],
-                                  loc='upper left', prop={'size': 20})
-            plt.tight_layout()
-            # plt.savefig('Rooms and Subs ' + str(np.random.randint(0, 10000)),
-            #             dpi=300)
-            plt.savefig('plots/action_logits_per_room_%s.png' % get_timestamp(),
-                        dpi=300)
+                    # if str(config.env_name).startswith(
+                    #     "Fourrooms") and config.visualize_master_policy:
+                    #     plt.rcParams["figure.figsize"] = [12, 12]
+                    #     f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2,
+                    # sharex='col',
+                    #
+                    # sharey='row')
+                    #     axes = {'room0': ax1, 'room1': ax2, 'room2': ax3,
+                    # 'room3': ax4}
+                    #     for room in self.plot:
+                    #         axes[room].set_title(room, size=20)
+                    #         for sub in range(config.num_sub_policies):
+                    #             prob_list = self.plot[room][sub]
+                    #             axes[room].plot(range(len(prob_list)),
+                    # prob_list,
+                    #                             linewidth=5)
+                    #         axes[room].legend(['subpolicy' + str(sub) for
+                    # sub in
+                    #                            range(
+                    # config.num_sub_policies)],
+                    #                           loc='upper left',
+                    # prop={'size': 20})
+                    #     plt.tight_layout()
+                    #     plt.savefig('plots/action_logits_per_room_%s.png' %
+                    # get_timestamp(),
+                    #                 dpi=300)
 
 
 if __name__ == "__main__":

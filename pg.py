@@ -1,3 +1,4 @@
+import copy
 import datetime
 import os
 import time
@@ -8,11 +9,11 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.distributions as tfd
 import tensorflow.contrib.layers as layers
-from matplotlib import colors
 
 from config import config
 from test_env import *
 from utils.general import export_plot, get_logger
+from visualize import visualize_fourrooms_sub_policy
 
 
 def get_timestamp():
@@ -150,15 +151,18 @@ class PolicyGradient(object):
 
     def initialize(self):
         self.sess = tf.Session()
-        self.saver = tf.train.Saver()
+        self.saver = tf.train.Saver(
+            var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
+                                       scope='subpolicy'))
         self.add_summary()
-        init = tf.global_variables_initializer()
+        self.init = tf.global_variables_initializer()
+
+        self.sess.run(self.init)
 
         if config.recover_checkpoint_path:
             print("Recovering model...")
             self.recover_model_checkpoint(self.sess, self.saver,
                                           config.recover_checkpoint_path)
-        self.sess.run(init)
 
     def add_summary(self):
         self.avg_reward_placeholder = tf.placeholder(tf.float32, shape=(),
@@ -218,7 +222,6 @@ class PolicyGradient(object):
         rooms_and_sub_policies = {}
 
         while num_episodes or t < self.config.batch_size:
-            env = gym.make(self.config.get_env_name())
             self.env = env
             state = env.reset()
             states, actions, rewards = [], [], []
@@ -280,18 +283,18 @@ class PolicyGradient(object):
             if num_episodes and episode >= num_episodes:
                 break
 
-        if str(config.env_name).startswith("Fourrooms"):
-            counter_by_room = {}
-            for room in rooms_and_sub_policies:
-                counter = Counter(rooms_and_sub_policies[room])
-                s = sum([counter[sub] for sub in counter])
-                for sub in range(config.num_sub_policies):
-                    counter[sub] = counter[sub] * 1.0 / s if sub in counter \
-                        else \
-                        0.0
-                    self.plot[room][sub].append(counter[sub])
-                counter_by_room[room] = counter
-            print(counter_by_room)
+        # if str(config.env_name).startswith("Fourrooms"):
+        #     counter_by_room = {}
+        #     for room in rooms_and_sub_policies:
+        #         counter = Counter(rooms_and_sub_policies[room])
+        #         s = sum([counter[sub] for sub in counter])
+        #         for sub in range(config.num_sub_policies):
+        #             counter[sub] = counter[sub] * 1.0 / s if sub in counter \
+        #                 else \
+        #                 0.0
+        #             self.plot[room][sub].append(counter[sub])
+        #         counter_by_room[room] = counter
+        #     print(counter_by_room)
 
         return paths, episode_rewards
 
@@ -336,146 +339,142 @@ class PolicyGradient(object):
 
     def train(self):
         import matplotlib.pyplot as plt
-        last_record = 0
-
-        self.init_averages()
-        scores_eval = []
-        self.plot = {
-            'room' + str(i): {j: [] for j in range(config.num_sub_policies)} for
-            i in range(4)}
-
-        for t in range(self.config.num_batches):
-            print(t, self.get_epsilon(t))
-            paths, total_rewards = self.sample_path(env=self.env)
-
-            scores_eval += total_rewards
-
-            if str(config.env_name).startswith("Fourrooms"):
-                observations = np.expand_dims(
-                    np.concatenate([path["observation"] for path in paths]),
-                    axis=1)
-            else:
-                observations = np.concatenate(
-                    [path["observation"] for path in paths])
-
-            actions = np.concatenate([path["action"] for path in paths])
-            rewards = np.concatenate([path["reward"] for path in paths])
-            returns = self.get_returns(paths)
-            advantages = self.calculate_advantage(returns, observations)
-
-            if self.config.use_baseline:
-                self.update_baseline(returns, observations)
-
-            self.sess.run(self.train_op, feed_dict={
-                self.observation_placeholder: observations,
-                self.action_placeholder: actions,
-                self.advantage_placeholder: advantages
-            })
-
-            if t % self.config.summary_freq == 0:
-                self.update_averages(total_rewards, scores_eval)
-                self.record_summary(self.batch_counter)
-
-            self.batch_counter += 1
-
-            avg_reward = np.mean(total_rewards)
-            sigma_reward = np.sqrt(np.var(total_rewards) / len(total_rewards))
-            msg = "Average reward: {:04.2f} +/- {:04.2f}".format(avg_reward,
-                                                                 sigma_reward)
-            self.logger.info(msg)
-
-            last_record += 1
-            if self.config.record and (last_record > self.config.record_freq):
-                self.logger.info("Recording...")
-                last_record = 0
-                self.record()
-
-            # TODO: Message for Jiayu: This is the subpolicy viz code
-            if t == config.num_batches - 1 and config.visualize_sub_policies:
-                logits = self.sess.run(self.sub_policies, feed_dict={
-                    self.observation_placeholder: np.expand_dims(np.arange(81),
-                                                                 axis=1)
+        sub_policies = []
+        for index in range(2):
+            self.sess.run(self.init)
+            if index == 0:
+                self.env.reset(seed={
+                    'fixedstart+goal:start': (self.env.nS - self.env.ncol - 1),
+                    'fixedstart+goal:goal': 2
                 })
-                plt.clf()
-                fig, axes = plt.subplots(1, 2)
+            else:
+                self.env.reset(seed={
+                    'fixedstart+goal:start': (1 + self.env.ncol),
+                    'fixedstart+goal:goal': (self.env.nS - 3)
+                })
+            last_record = 0
 
-                left = 0
-                down = 1
-                right = 2
-                up = 3
-                block = -1
-                goal = -2
+            self.init_averages()
+            scores_eval = []
+            self.plot = {
+                'room' + str(i): {j: [] for j in range(config.num_sub_policies)}
+                for i in range(4)}
 
-                for sub in range(config.num_sub_policies):
-                    actions = np.argmax(logits[:, sub, :], axis=1)
-                    map = [left, down, right, up]
+            for t in range(self.config.num_batches):
+                print(t, self.get_epsilon(t))
+                paths, total_rewards = self.sample_path(env=self.env)
 
-                    grid_vector = [map[i] for i in actions]
+                scores_eval += total_rewards
 
-                    room0 = [2, 10, 11, 12, 19, 20, 21, 28, 29, 30]
-                    room1 = [14, 15, 16, 22, 23, 24, 25, 32, 33, 34]
-                    room2 = [38, 46, 47, 48, 55, 56, 57, 64, 65, 66]
-                    room3 = [42, 50, 51, 52, 58, 59, 60, 61, 68, 69, 70]
+                if str(config.env_name).startswith("Fourrooms"):
+                    observations = np.expand_dims(
+                        np.concatenate([path["observation"] for path in paths]),
+                        axis=1)
+                else:
+                    observations = np.concatenate(
+                        [path["observation"] for path in paths])
 
-                    indices = room0 + room1 + room2 + room3
+                actions = np.concatenate([path["action"] for path in paths])
+                rewards = np.concatenate([path["reward"] for path in paths])
+                returns = self.get_returns(paths)
+                advantages = self.calculate_advantage(returns, observations)
 
-                    for i in range(81):
-                        if i not in indices:
-                            grid_vector[i] = block
+                if self.config.use_baseline:
+                    self.update_baseline(returns, observations)
 
-                    grid_vector[2] = goal
-                    grid_vector[78] = goal
+                self.sess.run(self.train_op, feed_dict={
+                    self.observation_placeholder: observations,
+                    self.action_placeholder: actions,
+                    self.advantage_placeholder: advantages
+                })
 
-                    grid = np.array_split(grid_vector, 9)
-                    # create discrete colormaps
-                    cmap = colors.ListedColormap(
-                        ['green', 'black', 'red', 'blue', 'pink', 'cyan'])
-                    bounds = [-2, -1, 0, 1, 2, 3, 4]
-                    norm = colors.BoundaryNorm(bounds, cmap.N)
+                if t % self.config.summary_freq == 0:
+                    self.update_averages(total_rewards, scores_eval)
+                    self.record_summary(self.batch_counter)
 
-                    ax = axes[sub % 2]
-                    ax.imshow(grid, cmap=cmap, norm=norm)
-                    ax.set_title('Sub Policy ' + str(sub))
+                self.batch_counter += 1
 
-                    # draw gridlines
-                    ax.grid(which='major', axis='both', linestyle='-',
-                            color='k', linewidth=2)
-                    ax.set_xticks(np.arange(-.5, 9, 1))
-                    ax.set_yticks(np.arange(-.5, 9, 1))
-                    ax.xaxis.set_ticklabels([])
-                    ax.yaxis.set_ticklabels([])
-                plt.tight_layout()
-                plt.savefig(str(np.random.randint(0, 10000)) + ' test.png')
+                avg_reward = np.mean(total_rewards)
+                sigma_reward = np.sqrt(
+                    np.var(total_rewards) / len(total_rewards))
+                msg = "Average reward: {:04.2f} +/- {:04.2f}".format(avg_reward,
+                                                                     sigma_reward)
+                self.logger.info(msg)
 
-            if t % config.record_freq == 0:
-                self.save_model_checkpoint(self.sess, self.saver,
-                                           os.path.join(self.config.output_path,
+                last_record += 1
+                if self.config.record and (
+                        last_record > self.config.record_freq):
+                    self.logger.info("Recording...")
+                    last_record = 0
+                    self.record()
 
-                                                        'model.ckpt'), t)
+                # TODO: Message for Jiayu: This is the subpolicy viz code
+                if t == config.num_batches - 1 and config.viz_sub_policies:
+                    logits = self.sess.run(self.sub_policies, feed_dict={
+                        self.observation_placeholder: np.expand_dims(
+                            np.arange(81), axis=1)
+                    })
+                    plt.clf()
+                    sub_policy_actions = []
+                    envs = []
+                    sub_policies.append(logits[:, 0, :])
+                    if len(sub_policies) == 2:
 
-        self.logger.info("- Training done.")
-        export_plot(scores_eval, "Score", config.env_name,
-                    self.config.plot_output)
+                        self.env.reset(seed={
+                            'fixedstart+goal:start': (
+                            self.env.nS - self.env.ncol - 2),
+                            'fixedstart+goal:goal': 2
+                        })
+                        envs.append(copy.deepcopy(self.env))
+                        self.env.reset(seed={
+                            'fixedstart+goal:start': (1 + self.env.ncol),
+                            'fixedstart+goal:goal': (self.env.nS - 3)
+                        })
+                        envs.append(copy.deepcopy(self.env))
 
-        if str(config.env_name).startswith(
-            "Fourrooms") and config.visualize_master_policy:
-            import matplotlib.pyplot as plt
-            plt.rcParams["figure.figsize"] = [12, 12]
-            f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, sharex='col',
-                                                       sharey='row')
-            axes = {'room0': ax1, 'room1': ax2, 'room2': ax3, 'room3': ax4}
-            for room in self.plot:
-                axes[room].set_title(room, size=20)
-                for sub in range(config.num_sub_policies):
-                    prob_list = self.plot[room][sub]
-                    axes[room].plot(range(len(prob_list)), prob_list,
-                                    linewidth=5)
-                axes[room].legend(['subpolicy' + str(sub) for sub in
-                                   range(config.num_sub_policies)],
-                                  loc='upper left', prop={'size': 20})
-            plt.tight_layout()
-            plt.savefig('Rooms and Subs ' + str(np.random.randint(0, 10000)),
-                        dpi=300)
+                        sub_policy_actions.append(
+                            np.argmax(sub_policies[0], axis=1))
+                        sub_policy_actions.append(
+                            np.argmax(sub_policies[1], axis=1))
+
+                        visualize_fourrooms_sub_policy(envs, sub_policy_actions)
+
+                        plt.tight_layout()
+                        plt.savefig('plots/' + str(
+                            np.random.randint(0, 10000)) + '-test.png')
+
+                if t % config.record_freq == 0:
+                    self.save_model_checkpoint(self.sess, self.saver,
+                                               os.path.join(
+                                                   self.config.output_path,
+
+                                                   'model.ckpt'), t)
+
+            self.logger.info("- Training done.")
+            export_plot(scores_eval, "Score", config.env_name,
+                        self.config.plot_output)
+
+            # if str(config.env_name).startswith(
+            #     "Fourrooms") and config.visualize_master_policy:
+            #     import matplotlib.pyplot as plt
+            #     plt.rcParams["figure.figsize"] = [12, 12]
+            #     f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, sharex='col',
+            #                                                sharey='row')
+            #     axes = {'room0': ax1, 'room1': ax2, 'room2': ax3, 'room3':
+            # ax4}
+            #     for room in self.plot:
+            #         axes[room].set_title(room, size=20)
+            #         for sub in range(config.num_sub_policies):
+            #             prob_list = self.plot[room][sub]
+            #             axes[room].plot(range(len(prob_list)), prob_list,
+            #                             linewidth=5)
+            #         axes[room].legend(['subpolicy' + str(sub) for sub in
+            #                            range(config.num_sub_policies)],
+            #                           loc='upper left', prop={'size': 20})
+            #     plt.tight_layout()
+            #     plt.savefig('Rooms and Subs ' + str(np.random.randint(0,
+            # 10000)),
+            #                 dpi=300)
 
     def get_room_by_state(self, state):
         room0 = [2, 10, 11, 12, 19, 20, 21, 28, 29, 30]

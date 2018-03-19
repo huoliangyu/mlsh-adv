@@ -38,11 +38,11 @@ class config():
         self.output_path = output_path
 
     # env_name = "CartPole-v0"
-    env_name = 'BipedalWalker-v2'
+    # env_name = 'BipedalWalker-v2'
 
     # env_name = "InvertedPendulum-v1"
     # env_name = "Fourrooms-v1"
-    # env_name = "Fourrooms-small-v0"
+    env_name = "Fourrooms-small-v0"
 
     # env_name = "HalfCheetah-v1"
     # env_name = "Ant-v1"
@@ -71,36 +71,29 @@ class config():
     }
 
     num_batches_by_env = {
-        "CartPole-v0": 100, "Fourrooms-small-v0": 100, "Fourrooms-v1": 10, \
+        "CartPole-v0": 100, "Fourrooms-small-v0": 150, "Fourrooms-v1": 10, \
         "HalfCheetah-v1": 1000, "Ant-v1": 1000, "Ant-v2": 1000,
         "BipedalWalker-v2": 1000
     }
 
     # TODO message: Jiayu, this is where you toggle doing viz or not
     visualize_master_policy = True
-    visualize_sub_policies = True
+    viz_sub_policies = True
 
     num_hid_layers = 2
-    hid_size = 64
+    hid_size = 8
     recurrent_hid_size = 4
 
     recover_checkpoint_path = None
     # recover_checkpoint_path = \
-    #     "results/Fourrooms-v1-bs=1000-algo=RecurrentMLSH-v2-usebaseline
-    # =True" \
-    #
-    # "-lr=0.03-baselinelayers=4x32-num_sub=2-maxeps" \
-    #     "=0.0-mineps=0.0" \
-    #
-    # "-sub_index=-1-freezesub=False-uniquestr=j-numsublayers=4" \
-    #
-    # "-nummasterlayers=4-max_num_sub=4-weighted_avg" \
-    #     "=False-sub_net=LSTM" \
-    #                           "-master_net=LSTM/model.ckpt-100"
+    #     "results/Fourrooms-small-v0-bs=1000-algo=RecurrentMLSH-v2-usebl=True" \
+    #                           "-lr=0.03-bllayers=4x32-num_sub=2-maxe=0.0-mine" \
+    #                           "=0.0-sub_idx=-1-frsub" \
+    #                           "=False-key=-numsublyrs=1-nummasterlyrs=1-maxnumsub=4-wa=False-sub=LSTM-r=True-master=LSTM-num_hid_l=2-hid_size=64-rhs=4/model.ckpt-199"
     record = False
     do_meta_learning = True
     num_meta_learning_training_tasks = 25
-    master_timescale = 25
+    master_timescale = 2
     warmup = 50
     unique_key = ""
     render = False
@@ -117,11 +110,11 @@ class config():
     normalize_advantage = True
     n_layers = 4
     baseline_layer_size = 32
-    max_num_sub_policies = 4
-    num_sub_policies = 2
+    max_num_sub_policies = 8
+    num_sub_policies = 1
 
-    sub_policy_network = 'LSTM'
-    master_network = 'LSTM'
+    sub_policy_network = 'GRU'
+    master_network = 'GRU'
     num_sub_policy_layers = 1
     num_master_layers = 1
 

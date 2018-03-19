@@ -27,6 +27,9 @@ def train(env_id, num_timesteps, seed, config):
     elif config.algorithm == 'RecurrentMLSHV12':
         from baselines.ppo1.recurrent_mlsh_v12 import RecurrentMLSHV12 as policy
         from baselines.ppo1 import pposgd_simple_alt as pposgd_simple
+    elif config.algorithm == 'RecurrentMLSHV13':
+        from baselines.ppo1.recurrent_mlsh_v13 import RecurrentMLSHV13 as policy
+        from baselines.ppo1 import pposgd_simple_alt as pposgd_simple
     elif config.algorithm == 'mlp_policy':
         from mlp_policy import MlpPolicy as policy
         from baselines.ppo1 import pposgd_simple
