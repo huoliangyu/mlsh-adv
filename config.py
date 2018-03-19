@@ -101,6 +101,7 @@ class config():
     do_meta_learning = True
     num_meta_learning_training_tasks = 25
     master_timescale = 25
+    warmup = 50
     unique_key = ""
     render = False
     max_epsilon = 0.0
@@ -116,7 +117,7 @@ class config():
     normalize_advantage = True
     n_layers = 4
     baseline_layer_size = 32
-    max_num_sub_policies = 2
+    max_num_sub_policies = 4
     num_sub_policies = 2
 
     sub_policy_network = 'LSTM'

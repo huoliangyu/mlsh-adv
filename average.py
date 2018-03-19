@@ -17,10 +17,10 @@ def walklevel(some_dir, level=1):
 
 root = os.path.expanduser('~/Desktop/openai')
 best = []
-prefixes = ['openai-2018-03-18-22-15']
-# prefixes = ['openai-2018-03-18-21-49']
+# prefixes = ['openai-2018-03-18-22-43']
+prefixes = ['openai-2018-03-18-22-42-5']
 
-cutoff = 30000000
+cutoff = 100000000
 
 for prefix in prefixes:
     dirs = walklevel(root, level=2)
@@ -40,9 +40,10 @@ for prefix in prefixes:
                         item = {}
                         for (name, value) in items:
                             item[name] = value.strip()
-                        rewards.append(float(item['EpRewMean']))
-                        length.append(float(item['TimestepsSoFar']))
-                    best.append(max(rewards[:cutoff]))
+                        if float(item['TimestepsSoFar']) < cutoff:
+                            rewards.append(float(item['EpRewMean']))
+                            length.append(float(item['TimestepsSoFar']))
+                    best.append(max(rewards))
                     print(max(length))
                     assert max(length) > 3000000
                 except Exception as e:
