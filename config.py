@@ -47,7 +47,7 @@ class config():
     num_sub_policy_layers = 1
     num_master_layers = 1
 
-    master_timescale = 4
+    master_timescale = 25
 
     warmup = 40
     #=====================================================

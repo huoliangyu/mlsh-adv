@@ -38,6 +38,7 @@ class RecurrentMLSHV2META(PolicyGradient):
                                                            shape=None)
 
         self.chosen_sub_policy_index_placeholder = tf.placeholder(tf.int32, [None])
+        self.task_choices_placeholder = tf.placeholder(tf.int64, [None])
 
     def build(self):
         # self.last_chosen_index = tf.constant(0)
@@ -94,8 +95,7 @@ class RecurrentMLSHV2META(PolicyGradient):
         max_output = tf.reduce_max(last_output, axis=1, keep_dims=True)
         tmp = tf.nn.relu(last_output - max_output + 1e-17)
         self.weights = tmp / tf.reduce_sum(tmp, axis=1, keep_dims=True)
-        self.last_chosen_one_hot = chosen_one_hot = tf.expand_dims(self.weights,
-                                                                   axis=2)
+        self.last_chosen_one_hot = chosen_one_hot = tf.expand_dims(self.weights, axis=2)
         return chosen_one_hot
 
     def build_policy_network_op(self, scope="policy_network"):
@@ -126,7 +126,8 @@ class RecurrentMLSHV2META(PolicyGradient):
                 labels=self.action_placeholder, logits=self.action_logits)
 
             self.master_logprob = -tf.nn.sparse_softmax_cross_entropy_with_logits(
-                labels=self.master_chosen_sub_policy_index,
+                # labels=self.master_chosen_sub_policy_index,
+                labels=self.task_choices_placeholder,
                 logits=self.master_policy_action_logits)
         else:
             action_means = self.final_policy
@@ -176,35 +177,39 @@ class RecurrentMLSHV2META(PolicyGradient):
         paths = []
         t = 0
         self.indices = []
+        self.task_choices = []
 
         chosen_sub_policy_index = np.random.randint(0, self.config.num_sub_policies)
 
         while num_episodes or t < self.config.batch_size:
-            # index = np.random.randint(0, self.config.num_meta_learning_distinct_tasks)
-            # if index == 0:
-            #     state = self.env.reset(seed={
-            #         'fixedstart+goal:start': (env.nS - env.ncol - 2),
-            #         'fixedstart+goal:goal': 2
-            #     })
-            # elif index == 1:
-            #     state = self.env.reset(seed={
-            #         'fixedstart+goal:start': (1 + env.ncol),
-            #         'fixedstart+goal:goal': (env.nS - 3)
-            #     })
-            # elif index == 2:
-            #     state = self.env.reset(seed={
-            #         'fixedstart+goal:start': (2 * env.ncol - 2),
-            #         'fixedstart+goal:goal': (env.nS - env.ncol * 3)
-            #     })
-            # else:
-            #     state = self.env.reset(seed={
-            #         'fixedstart+goal:start': (env.nS - env.ncol * 2 + 1),
-            #         'fixedstart+goal:goal': (env.ncol * 3 - 1)
-            #     })
+
+            state = env.reset()
+
+            if self.initial_task:
+                index = np.random.randint(0, self.config.num_meta_learning_distinct_tasks)
+                if index == 0:
+                    state = self.env.reset(seed={
+                        'fixedstart+goal:start': (env.nS - env.ncol - 2),
+                        'fixedstart+goal:goal': 2
+                    })
+                elif index == 1:
+                    state = self.env.reset(seed={
+                        'fixedstart+goal:start': (1 + env.ncol),
+                        'fixedstart+goal:goal': (env.nS - 3)
+                    })
+                elif index == 2:
+                    state = self.env.reset(seed={
+                        'fixedstart+goal:start': (2 * env.ncol - 2),
+                        'fixedstart+goal:goal': (env.nS - env.ncol * 3)
+                    })
+                else:
+                    state = self.env.reset(seed={
+                        'fixedstart+goal:start': (env.nS - env.ncol * 2 + 1),
+                        'fixedstart+goal:goal': (env.ncol * 3 - 1)
+                    })
 
             # print 'task start %s, goal %s' % (self.env.start, self.env.goal)
 
-            state = env.reset()
             states, actions, rewards = [], [], []
             episode_reward = 0
             rooms = []
@@ -221,11 +226,18 @@ class RecurrentMLSHV2META(PolicyGradient):
                     room = self.get_room_by_state(state)
                     rooms.append(room)
 
-                    if is_at_master_timescale:
+                    if self.initial_task:
+                        chosen_sub_policy_index = index
+
+                    if is_at_master_timescale and not self.initial_task:
                         chosen_sub_policy_index = self.sess.run(self.master_chosen_sub_policy_index, feed_dict={
                             self.observation_placeholder: [[states[-1]]],
                         })
                         chosen_sub_policy_index = chosen_sub_policy_index[0]
+
+                    #     print 'step = %s, master_chosen_sub_policy_index = %s' % (step, chosen_sub_policy_index)
+                    # else:
+                    #     print 'step = %s, chosen_sub_policy_index = %s' % (step, chosen_sub_policy_index)
 
                     action = self.sess.run(self.sampled_action, feed_dict={
                         # self.at_master_timescale_placeholder: is_at_master_timescale,
@@ -240,6 +252,7 @@ class RecurrentMLSHV2META(PolicyGradient):
                     action = action[0]
 
                 self.indices.append(chosen_sub_policy_index)
+                self.task_choices.append(self.task_choice)
 
                 action = self.epsilon_greedy(action=action,
                                              eps=self.get_epsilon(ti))
@@ -251,6 +264,7 @@ class RecurrentMLSHV2META(PolicyGradient):
                 rewards.append(reward)
                 episode_reward += reward
                 t += 1
+
                 if done or step == self.config.max_ep_len - 1:
                     episode_rewards.append(episode_reward)
                     break
@@ -298,10 +312,14 @@ class RecurrentMLSHV2META(PolicyGradient):
         print 'num_tasks = %s' % num_tasks
 
         for taski in xrange(num_tasks):
+            # self.initial_task = (taski == 0)
+            self.initial_task = True
+
             print '===================== task #%s =====================' % taski
 
+            self.task_choice = 0
             if self.config.do_meta_learning:
-                sampled_task = np.random.randint(0, self.config.num_meta_learning_distinct_tasks)
+                self.task_choice = sampled_task = np.random.randint(0, self.config.num_meta_learning_distinct_tasks)
                 if sampled_task == 0:
                     self.env.reset(seed={
                         'fixedstart+goal:start': (env.nS - env.ncol - 2),
@@ -353,8 +371,8 @@ class RecurrentMLSHV2META(PolicyGradient):
                     self.observation_placeholder: observations,
                     self.action_placeholder: actions,
                     self.master_advantage_placeholder: master_advantages,
-                    # self.chosen_sub_policy_index_placeholder: self.indices
                     # self.master_advantage_placeholder: advantages,
+                    self.task_choices_placeholder: self.task_choices,
                 })
 
                 if t >= self.config.warmup:
